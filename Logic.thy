@@ -40,17 +40,17 @@ lemma entails_trans:
   by (metis assms(1) assms(2) entails_def)
 
 definition setify_prop where
-  "setify_prop b = { (\<sigma>, l) |\<sigma> l. b \<sigma>}"
+  "setify_prop b = {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. b \<sigma>\<^sub>p}"
 
 lemma sem_assume_setify:
   "sem (Assume b) S = S \<inter> setify_prop b" (is "?A = ?B")
 proof -
-  have "\<And> \<sigma> l. (\<sigma>, l) \<in> ?A \<longleftrightarrow> (\<sigma>, l) \<in> ?B"
+  have "\<And>\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> ?A \<longleftrightarrow> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> ?B"
   proof -
-    fix \<sigma> l
-    have "(\<sigma>, l) \<in> ?A \<longleftrightarrow> (\<sigma>, l) \<in> S \<and> b \<sigma>"
+    fix \<sigma>\<^sub>l \<sigma>\<^sub>p l
+    have "(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> ?A \<longleftrightarrow> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S \<and> b \<sigma>\<^sub>p"
       by (simp add: assume_sem)
-    then show "(\<sigma>, l) \<in> ?A \<longleftrightarrow> (\<sigma>, l) \<in> ?B"
+    then show "(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> ?A \<longleftrightarrow> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> ?B"
       by (simp add: setify_prop_def)
   qed
   then show ?thesis
@@ -214,9 +214,9 @@ lemma skip_rule:
   by (simp add: hyper_hoare_triple_def sem_skip)
 
 lemma assume_rule:
-  "\<Turnstile> {(\<lambda>S. P (Set.filter (b \<circ> fst) S)) } (Assume b) {P}"
+  "\<Turnstile> {(\<lambda>S. P (Set.filter (b \<circ> fst \<circ> snd) S)) } (Assume b) {P}"
 proof (rule hyper_hoare_tripleI)
-  fix S assume "P (Set.filter (b \<circ> fst) S)"
+  fix S assume "P (Set.filter (b \<circ> fst \<circ> snd) S)"
   then show "P (sem (Assume b) S)"
     by (simp add: assume_sem)
 qed
@@ -235,45 +235,47 @@ lemma if_rule:
   by (metis (full_types) assms(1) assms(2) hyper_hoare_triple_def join_def sem_if)
 
 lemma assign_rule:
-  "\<Turnstile> {(\<lambda>S. P {(\<sigma>(x := e \<sigma>), l) |\<sigma> l. (\<sigma>, l) \<in> S }) } (Assign x e) {P}"
+  "\<Turnstile> {(\<lambda>S. P {(\<sigma>\<^sub>l, \<sigma>\<^sub>p(x := e \<sigma>\<^sub>p), l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S }) } (Assign x e) {P}"
 proof (rule hyper_hoare_tripleI)
-  fix S assume "P {(\<sigma>(x := e \<sigma>), l) |\<sigma> l. (\<sigma>, l) \<in> S }"
+  fix S assume "P {(\<sigma>\<^sub>l, \<sigma>\<^sub>p(x := e \<sigma>\<^sub>p), l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S }"
   then show "P (sem (Assign x e) S)" using sem_assign
     by metis
 qed
 
 
 lemma havoc_rule:
-  "\<Turnstile> {(\<lambda>S. P { (\<sigma>(x := v), l) |\<sigma> l v. (\<sigma>, l) \<in> S })} (Havoc x) {P}"
+  "\<Turnstile> {(\<lambda>S. P {(\<sigma>\<^sub>l, \<sigma>\<^sub>p(x := v), l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S})} (Havoc x) {P}"
 proof (rule hyper_hoare_tripleI)
-  fix S assume "P { (\<sigma>(x := v), l) |\<sigma> l v. (\<sigma>, l) \<in> S }"
-  then show "P (sem (Havoc x) S)" using sem_havoc by presburger
+  fix S assume "P {(\<sigma>\<^sub>l, \<sigma>\<^sub>p(x := v), l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}"
+  then show "P (sem (Havoc x) S)" using sem_havoc by metis
 qed
 
 lemma send_rule:
-  "\<Turnstile> {(\<lambda>S. P ({(\<sigma>, l @ [OutBlock ch (e \<sigma>)]) |\<sigma> l. (\<sigma>, l) \<in> S} \<union>
-  {(\<sigma>, l @ [WaitBlk d (\<lambda>_. State \<sigma>) ({ch}, {}), OutBlock ch (e \<sigma>)]) |\<sigma> l d. (d::real) > 0 \<and> (\<sigma>, l) \<in> S} \<union>
-  {(\<sigma>, l @ [WaitBlk \<infinity> (\<lambda>_. State \<sigma>) ({ch}, {})]) |\<sigma> l. (\<sigma>, l) \<in> S}))} (Cm (ch[!]e)) {P}"
+  "\<Turnstile> {(\<lambda>S. P ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [OutBlock ch (e \<sigma>\<^sub>p)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
+  {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk d (\<lambda>_. State \<sigma>\<^sub>p) ({ch}, {}), OutBlock ch (e \<sigma>\<^sub>p)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d. (d::real) > 0 \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
+  {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk \<infinity> (\<lambda>_. State \<sigma>\<^sub>p) ({ch}, {})]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}))} (Cm (ch[!]e)) {P}"
 proof (rule hyper_hoare_tripleI)
   fix S
-  assume "P ({(\<sigma>, l @ [OutBlock ch (e \<sigma>)]) |\<sigma> l. (\<sigma>, l) \<in> S} \<union>
-  {(\<sigma>, l @ [WaitBlk (ereal d) (\<lambda>_. State \<sigma>) ({ch}, {}), OutBlock ch (e \<sigma>)]) |\<sigma> l d. 0 < d \<and> (\<sigma>, l) \<in> S} \<union>
-  {(\<sigma>, l @ [WaitBlk \<infinity> (\<lambda>_. State \<sigma>) ({ch}, {})]) |\<sigma> l. (\<sigma>, l) \<in> S})"
+  assume "P ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [OutBlock ch (e \<sigma>\<^sub>p)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
+  {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk d (\<lambda>_. State \<sigma>\<^sub>p) ({ch}, {}), OutBlock ch (e \<sigma>\<^sub>p)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d. (d::real) > 0 \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
+  {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk \<infinity> (\<lambda>_. State \<sigma>\<^sub>p) ({ch}, {})]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S})"
   then show "P (sem (Cm (ch[!]e)) S)"
-    using sem_send by presburger
+    using sem_send by metis
 qed
 
 lemma recv_rule:
-  "\<Turnstile> {(\<lambda>S. P ({(\<sigma>(var := v), l @ [InBlock ch v]) |\<sigma> l v. (\<sigma>, l) \<in> S} \<union>
-  {(\<sigma>(var := v), l @ [WaitBlk d (\<lambda>_. State \<sigma>) ({}, {ch}), InBlock ch v]) |\<sigma> l d v. (d::real) > 0 \<and> (\<sigma>, l) \<in> S} \<union>
-  {(\<sigma>, l @ [WaitBlk \<infinity> (\<lambda>_. State \<sigma>) ({}, {ch})]) |\<sigma> l. (\<sigma>, l) \<in> S}))} (Cm (ch[?]var)) {P}"
+  "\<Turnstile> {(\<lambda>S. P ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p(var := v), l @ [InBlock ch v]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
+  {(\<sigma>\<^sub>l, \<sigma>\<^sub>p(var := v), l @ [WaitBlk d (\<lambda>_. State \<sigma>\<^sub>p) ({}, {ch}), InBlock ch v]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d v. (d::real) > 0 
+  \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
+  {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk \<infinity> (\<lambda>_. State \<sigma>\<^sub>p) ({}, {ch})]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}))} (Cm (ch[?]var)) {P}"
 proof(rule hyper_hoare_tripleI)
   fix S
-  assume "P ({(\<sigma>(var := v), l @ [InBlock ch v]) |\<sigma> l v. (\<sigma>, l) \<in> S} \<union>
-  {(\<sigma>(var := v), l @ [WaitBlk (ereal d) (\<lambda>_. State \<sigma>) ({}, {ch}), InBlock ch v]) |\<sigma> l d v. 0 < d \<and> (\<sigma>, l) \<in> S} \<union>
-  {(\<sigma>, l @ [WaitBlk \<infinity> (\<lambda>_. State \<sigma>) ({}, {ch})]) |\<sigma> l. (\<sigma>, l) \<in> S})"
+  assume "P ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p(var := v), l @ [InBlock ch v]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
+  {(\<sigma>\<^sub>l, \<sigma>\<^sub>p(var := v), l @ [WaitBlk d (\<lambda>_. State \<sigma>\<^sub>p) ({}, {ch}), InBlock ch v]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d v. (d::real) > 0 
+  \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
+  {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk \<infinity> (\<lambda>_. State \<sigma>\<^sub>p) ({}, {ch})]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S})"
   then show "P (sem (Cm (ch[?]var)) S)"
-    using sem_recv by presburger
+    using sem_recv by metis
 qed
 
 text \<open>Loops\<close>
@@ -332,16 +334,16 @@ lemma rule_exists:
 text \<open>continous\<close>
 
 lemma rule_cont:
-  "\<Turnstile> {(\<lambda>S. P ({(\<sigma>, l) |\<sigma> l. (\<sigma>, l) \<in> S \<and> \<not> b \<sigma>} \<union> 
-  {(p d, l @ [WaitBlk d (\<lambda>\<tau>. State (p \<tau>)) ({}, {})]) |\<sigma> l p d. (\<sigma>, l) \<in> S \<and> d > 0 \<and> ODEsol ode p d 
-   \<and> (\<forall>t. t \<ge> 0 \<and> t < d \<longrightarrow> b (p t)) \<and> \<not>b (p d) \<and> p 0 = \<sigma>}))} (Cont ode b) {P}"
+  "\<Turnstile> {(\<lambda>S. P ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S \<and> \<not> b \<sigma>\<^sub>p} \<union> 
+  {(\<sigma>\<^sub>l, p d, l @ [WaitBlk d (\<lambda>\<tau>. State (p \<tau>)) ({}, {})]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l p d. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S \<and> d > 0 \<and> 
+  ODEsol ode p d \<and> (\<forall>t. t \<ge> 0 \<and> t < d \<longrightarrow> b (p t)) \<and> \<not>b (p d) \<and> p 0 = \<sigma>\<^sub>p}))} (Cont ode b) {P}"
 proof(rule hyper_hoare_tripleI)
   fix S 
-  assume "P ({(\<sigma>, l) |\<sigma> l. (\<sigma>, l) \<in> S \<and> \<not> b \<sigma>} \<union> 
-  {(p d, l @ [WaitBlk d (\<lambda>\<tau>. State (p \<tau>)) ({}, {})]) |\<sigma> l p d. (\<sigma>, l) \<in> S \<and> d > 0 \<and> ODEsol ode p d 
-   \<and> (\<forall>t. t \<ge> 0 \<and> t < d \<longrightarrow> b (p t)) \<and> \<not>b (p d) \<and> p 0 = \<sigma>})"
+  assume "P ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S \<and> \<not> b \<sigma>\<^sub>p} \<union> 
+  {(\<sigma>\<^sub>l, p d, l @ [WaitBlk d (\<lambda>\<tau>. State (p \<tau>)) ({}, {})]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l p d. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S \<and> d > 0 \<and> 
+  ODEsol ode p d \<and> (\<forall>t. t \<ge> 0 \<and> t < d \<longrightarrow> b (p t)) \<and> \<not>b (p d) \<and> p 0 = \<sigma>\<^sub>p})"
   then show "P (sem (Cont ode b) S)"
-    using sem_ode by presburger
+    using sem_ode by metis
 qed
 
 
