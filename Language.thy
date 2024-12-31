@@ -719,6 +719,72 @@ proof
   qed
 qed
 
+lemma sem_init_Nil:
+  "sem (Interrupt ode b []) \<Sigma> = {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> \<Sigma> \<and> \<not> b \<sigma>\<^sub>p} \<union>
+   {(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr0 @ [WaitBlk d (\<lambda> \<tau>. State (sl \<tau>)) (rdy_of_echoice [])]) |\<sigma>\<^sub>l \<sigma>\<^sub>p tr0 d sl \<sigma>\<^sub>p'.
+   (\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> \<Sigma> \<and> d > 0 \<and> ODEsol ode sl d \<and> (\<forall>t. t \<ge> 0 \<and> t < d \<longrightarrow> b (sl t)) \<and> \<not> b (sl d) \<and> 
+   sl 0 = \<sigma>\<^sub>p \<and> sl d = \<sigma>\<^sub>p'}" (is "?A = ?B \<union> ?C")
+proof
+  show "?A \<subseteq> ?B \<union> ?C"
+  proof(rule subsetTupleI)
+    fix \<sigma>\<^sub>l \<sigma>\<^sub>p' l assume "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l) \<in> ?A"
+    then obtain \<sigma>\<^sub>p tr0 tr1 where "(\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> \<Sigma>" "big_step (Interrupt ode b []) \<sigma>\<^sub>p tr1 \<sigma>\<^sub>p'"
+    "l = tr0 @ tr1"
+      by (metis fst_conv in_sem snd_conv)
+    then show "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l) \<in> ?B \<union> ?C"
+    proof (rule_tac interruptE[of ode b Nil \<sigma>\<^sub>p tr1 \<sigma>\<^sub>p'], simp)
+      fix i 
+      assume "i < length []"
+      then show ?thesis
+        by auto
+    next
+      fix i
+      assume "i < length []"
+      then show "?thesis"
+        by auto
+    next
+      fix i 
+      assume "i < length []"
+      then show ?thesis
+        by auto
+    next
+      fix i
+      assume "i < length []"
+      then show "?thesis"
+        by auto
+    next
+      assume "(\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> \<Sigma>" "big_step (Interrupt ode b []) \<sigma>\<^sub>p tr1 \<sigma>\<^sub>p'" "l = tr0 @ tr1"
+             "tr1 = []" "\<sigma>\<^sub>p' = \<sigma>\<^sub>p" "\<not> b \<sigma>\<^sub>p"
+      then have "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l) \<in> ?B" by blast
+      then show ?thesis by blast
+    next
+      fix d p
+      assume "(\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> \<Sigma>" "big_step (Interrupt ode b []) \<sigma>\<^sub>p tr1 \<sigma>\<^sub>p'" "l = tr0 @ tr1"
+      "tr1 = [WaitBlk (ereal d) (\<lambda>\<tau>. State (p \<tau>)) (rdy_of_echoice [])]"
+      "0 < d" "ODEsol ode p d" "\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (p t)"
+      "\<not> b \<sigma>\<^sub>p'" "p 0 = \<sigma>\<^sub>p" "p d = \<sigma>\<^sub>p'"
+      then have "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l) \<in> ?C"
+        by auto
+      then show ?thesis by blast
+    qed
+  qed
+next
+  show "?B \<union> ?C \<subseteq> ?A"
+  proof(rule Un_least)
+    show "?B \<subseteq> ?A"
+      by (smt (verit) InterruptB1 append_self_conv mem_Collect_eq sem_def subsetTupleI)
+    show "?C \<subseteq> ?A"
+      by (smt (verit, del_insts) InterruptB2 mem_Collect_eq sem_def subsetI)
+  qed
+qed
+
+lemma sem_init_Suc_Send:
+  "sem (Interrupt ode b []) \<Sigma> = {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> \<Sigma> \<and> \<not> b \<sigma>\<^sub>p} \<union>
+   {(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr0 @ [WaitBlk d (\<lambda> \<tau>. State (sl \<tau>)) (rdy_of_echoice [])]) |\<sigma>\<^sub>l \<sigma>\<^sub>p tr0 d sl \<sigma>\<^sub>p'.
+   (\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> \<Sigma> \<and> d > 0 \<and> ODEsol ode sl d \<and> (\<forall>t. t \<ge> 0 \<and> t < d \<longrightarrow> b (sl t)) \<and> \<not> b (sl d) \<and> 
+   sl 0 = \<sigma>\<^sub>p \<and> sl d = \<sigma>\<^sub>p'}" (is "?A = ?B \<union> ?C")
+
+(*
 lemma sem_int:
   "sem (Interrupt ode b cs) S = {(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr0 @ OutBlock ch (e \<sigma>\<^sub>p) # tr1) |\<sigma>\<^sub>l \<sigma>\<^sub>p tr0 i ch e p tr1 \<sigma>\<^sub>p'. 
   (\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> S \<and> i < length cs \<and> cs ! i = (Send ch e, p) \<and> big_step p \<sigma>\<^sub>p tr1 \<sigma>\<^sub>p'} \<union>
@@ -839,6 +905,132 @@ proof
       then show "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l) \<in> ?A"
         using InterruptB2[of d ode sl b \<sigma>\<^sub>p \<sigma>\<^sub>p' rdy cs] in_sem by fastforce
     qed
+  qed
+qed
+*)
+
+lemma sem_interrupt_send1:
+  "sem C {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [OutBlock ch (e \<sigma>\<^sub>p)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> \<Sigma>} = {(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr0 @ OutBlock ch (e \<sigma>\<^sub>p) # tr1) 
+  |\<sigma>\<^sub>l \<sigma>\<^sub>p tr0 tr1 \<sigma>\<^sub>p'. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> \<Sigma> \<and> big_step C \<sigma>\<^sub>p tr1 \<sigma>\<^sub>p'}" (is "?A = ?B")
+proof
+  show "?A \<subseteq> ?B"
+  proof(rule subsetTupleI)
+    fix \<sigma>\<^sub>l \<sigma>\<^sub>p' l' 
+    assume "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l') \<in> ?A"
+    then obtain \<sigma>\<^sub>p tr0 l where "(\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> \<Sigma>" "big_step C \<sigma>\<^sub>p l \<sigma>\<^sub>p'" "l' = tr0 @ [OutBlock ch (e \<sigma>\<^sub>p)] @ l"
+      by (smt (verit) append.assoc fst_conv in_sem mem_Collect_eq snd_conv)
+    then show "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l') \<in> ?B"
+      by auto
+  qed
+next
+  show "?B \<subseteq> ?A"
+  proof(rule subsetTupleI)
+    fix \<sigma>\<^sub>l \<sigma>\<^sub>p' l' 
+    assume "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l') \<in> ?B"
+    then obtain \<sigma>\<^sub>p tr0 l where "(\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> \<Sigma>" "big_step C \<sigma>\<^sub>p l \<sigma>\<^sub>p'" "l' = tr0 @ [OutBlock ch (e \<sigma>\<^sub>p)] @ l"
+      by auto
+    then show "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l') \<in> ?A"
+      using in_sem by fastforce
+  qed
+qed
+
+lemma sem_interrupt_send2:
+  "sem C {(\<sigma>\<^sub>l, sl d, l @ [WaitBlk (ereal d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), OutBlock ch (e (sl d))]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d sl.
+  (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> \<Sigma> \<and> 0 < d \<and> ODEsol ode sl d \<and> sl 0 = \<sigma>\<^sub>p \<and> (\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (sl t))} = 
+  {(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr0 @ [WaitBlk d (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), OutBlock ch (e (sl d))] @ tr1) 
+  |\<sigma>\<^sub>l \<sigma>\<^sub>p tr0 d sl tr1 \<sigma>\<^sub>p'. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> \<Sigma> \<and> d > 0 \<and> ODEsol ode sl d \<and> sl 0 = \<sigma>\<^sub>p \<and>
+  (\<forall>t. t \<ge> 0 \<and> t < d \<longrightarrow> b (sl t)) \<and> big_step C (sl d) tr1 \<sigma>\<^sub>p'}" (is "?A = ?B")
+proof
+  show "?A \<subseteq> ?B"
+  proof(rule subsetTupleI)
+    fix \<sigma>\<^sub>l \<sigma>\<^sub>p' l' 
+    assume "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l') \<in> ?A"
+    then obtain \<sigma>\<^sub>p tr0 l d sl where "(\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> \<Sigma>" "0 < d" "ODEsol ode sl d" "sl 0 = \<sigma>\<^sub>p"
+    "\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (sl t)" "big_step C (sl d) l \<sigma>\<^sub>p'" 
+    "l' = tr0 @ [WaitBlk (ereal d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), OutBlock ch (e (sl d))] @ l"
+      by (smt (verit) append.assoc fst_conv in_sem mem_Collect_eq snd_conv)
+    then show "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l') \<in> ?B"
+      by auto
+  qed
+next
+  show "?B \<subseteq> ?A"
+  proof(rule subsetTupleI)
+    fix \<sigma>\<^sub>l \<sigma>\<^sub>p' l' 
+    assume "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l') \<in> ?B"
+    then obtain \<sigma>\<^sub>p tr0 d sl l where a: "(\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> \<Sigma>" "0 < d" "ODEsol ode sl d" "sl 0 = \<sigma>\<^sub>p" 
+    "\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (sl t)" "big_step C (sl d) l \<sigma>\<^sub>p'" 
+    "l' = (tr0 @ [WaitBlk (ereal d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), OutBlock ch (e (sl d))]) @ l"
+      by auto
+    then have "(\<sigma>\<^sub>l, sl d, tr0 @ [WaitBlk (ereal d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), OutBlock ch (e (sl d))])
+    \<in> {(\<sigma>\<^sub>l, sl d, l @ [WaitBlk (ereal d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), OutBlock ch (e (sl d))]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d sl.
+       (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> \<Sigma> \<and> 0 < d \<and> ODEsol ode sl d \<and> sl 0 = \<sigma>\<^sub>p \<and> (\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (sl t))}"
+      by auto
+    with a show "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l') \<in> ?A"
+      by (smt (verit, best) mem_Collect_eq sem_def)      
+  qed
+qed
+
+lemma sem_interrupt_recv1:
+  "sem C {(\<sigma>\<^sub>l, \<sigma>\<^sub>p(var := v), l @ [InBlock ch v]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> \<Sigma>} = {(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr0 @ InBlock ch v # tr1) 
+  |\<sigma>\<^sub>l \<sigma>\<^sub>p tr0 tr1 \<sigma>\<^sub>p' v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> \<Sigma> \<and> big_step C (\<sigma>\<^sub>p(var := v)) tr1 \<sigma>\<^sub>p'}" (is "?A = ?B")
+proof
+  show "?A \<subseteq> ?B"
+  proof(rule subsetTupleI)
+    fix \<sigma>\<^sub>l \<sigma>\<^sub>p' l' 
+    assume "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l') \<in> ?A"
+    then obtain \<sigma>\<^sub>p tr0 tr1 v where "(\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> \<Sigma>" "big_step C (\<sigma>\<^sub>p(var := v)) tr1 \<sigma>\<^sub>p'" 
+    "l' = tr0 @ [InBlock ch v] @ tr1"
+      by (smt (verit) Cons_eq_appendI Pair_inject append.assoc mem_Collect_eq self_append_conv2 sem_def)
+    then show "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l') \<in> ?B"
+      by auto
+  qed
+next
+  show "?B \<subseteq> ?A"
+  proof(rule subsetTupleI)
+    fix \<sigma>\<^sub>l \<sigma>\<^sub>p' l' 
+    assume "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l') \<in> ?B"
+    then obtain \<sigma>\<^sub>p tr0 tr1 v where "(\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> \<Sigma>" "big_step C (\<sigma>\<^sub>p(var := v)) tr1 \<sigma>\<^sub>p'" 
+    "l' = (tr0 @ [InBlock ch v]) @ tr1"
+      by auto
+    then show "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l') \<in> ?A"
+      using in_sem 
+      by (smt (verit, ccfv_threshold) CollectI fst_conv snd_conv)
+  qed
+qed
+
+lemma sem_interrupt_recv2:
+  "sem C {(\<sigma>\<^sub>l, (sl d)(var := v), l @ [WaitBlk (ereal d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), InBlock ch v]) 
+  |\<sigma>\<^sub>l \<sigma>\<^sub>p l d sl v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> \<Sigma> \<and> 0 < d \<and> ODEsol ode sl d \<and> sl 0 = \<sigma>\<^sub>p \<and> (\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (sl t))} = 
+  {(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr0 @ [WaitBlk d (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), InBlock ch v] @ tr1) 
+  |\<sigma>\<^sub>l \<sigma>\<^sub>p tr0 tr1 \<sigma>\<^sub>p' d sl v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> \<Sigma> \<and> d > 0 \<and> ODEsol ode sl d \<and> sl 0 = \<sigma>\<^sub>p \<and>
+  (\<forall>t. t \<ge> 0 \<and> t < d \<longrightarrow> b (sl t)) \<and> big_step C ((sl d)(var := v)) tr1 \<sigma>\<^sub>p'}" (is "?A = ?B")
+proof
+  show "?A \<subseteq> ?B"
+  proof(rule subsetTupleI)
+    fix \<sigma>\<^sub>l \<sigma>\<^sub>p' l' 
+    assume "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l') \<in> ?A"
+    then obtain \<sigma>\<^sub>p tr0 l d sl v where "(\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> \<Sigma>" "0 < d" "ODEsol ode sl d" "sl 0 = \<sigma>\<^sub>p"
+    "\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (sl t)" "big_step C ((sl d)(var := v)) l \<sigma>\<^sub>p'" 
+    "l' = tr0 @ [WaitBlk (ereal d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), InBlock ch v] @ l"
+      by (smt (verit) append.assoc fst_conv in_sem mem_Collect_eq snd_conv)
+    then show "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l') \<in> ?B"
+      by blast
+  qed
+next
+  show "?B \<subseteq> ?A"
+  proof(rule subsetTupleI)
+    fix \<sigma>\<^sub>l \<sigma>\<^sub>p' l' 
+    assume "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l') \<in> ?B"
+   then obtain \<sigma>\<^sub>p tr0 l d sl v where a: "(\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> \<Sigma>" "0 < d" "ODEsol ode sl d" "sl 0 = \<sigma>\<^sub>p"
+    "\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (sl t)" "big_step C ((sl d)(var := v)) l \<sigma>\<^sub>p'" 
+    "l' = (tr0 @ [WaitBlk (ereal d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), InBlock ch v]) @ l"
+      by auto
+    then have "(\<sigma>\<^sub>l, (sl d)(var := v), tr0 @ [WaitBlk (ereal d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs),InBlock ch v])
+    \<in> {(\<sigma>\<^sub>l, (sl d)(var := v), l @ [WaitBlk (ereal d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), InBlock ch v]) 
+      |\<sigma>\<^sub>l \<sigma>\<^sub>p l d sl v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> \<Sigma> \<and> 0 < d \<and> ODEsol ode sl d \<and> sl 0 = \<sigma>\<^sub>p \<and> (\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (sl t))}"
+      by auto
+    with a show "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l') \<in> ?A"
+      by (smt (verit, best) mem_Collect_eq sem_def)      
   qed
 qed
 
@@ -976,15 +1168,121 @@ primrec ex2gstate :: "('lvar, 'lval) exgstate \<Rightarrow> gstate"
   where "ex2gstate (ExState s) = State (snd s)"
   | "ex2gstate (ExParState s1 s2) = ParState (ex2gstate s1) (ex2gstate s2)"
 
-definition par_sem :: "pproc \<Rightarrow> (('lvar, 'lval) lstate \<times> gstate) set \<Rightarrow> (('lvar, 'lval) lstate \<times> gstate \<times> trace) set"
-  where "par_sem C S = {(s\<^sub>l, s\<^sub>p', l) |s\<^sub>l s\<^sub>p s\<^sub>p' l. (s\<^sub>l, s\<^sub>p) \<in> S \<and> par_big_step C s\<^sub>p l s\<^sub>p'}"
+fun ex_logical_same :: "('lvar, 'lval) exgstate \<Rightarrow> ('lvar, 'lval) exgstate \<Rightarrow> bool"
+  where "ex_logical_same (ExState s1) (ExState s1') = (fst s1 = fst s1')"
+  | "ex_logical_same (ExParState s1 s2) (ExParState s1' s2') = (ex_logical_same s1 s1' \<and> ex_logical_same s2 s2')"
+  | "ex_logical_same _ _ = False"
+
+lemma ex_logical_same_refl: 
+  "ex_logical_same s s"
+proof(induct s)
+  case (ExState x)
+  then show ?case
+    by simp
+next
+  case (ExParState s1 s2)
+  then show ?case 
+    by simp
+qed
+
+lemma ex_logical_same_comm:
+  assumes "ex_logical_same s0 s1"
+  shows "ex_logical_same s1 s0"
+  using assms
+proof(induct s0 arbitrary: s1)
+  case (ExState x)
+  then show ?case
+  proof-
+    obtain y where "s1 = ExState y" "fst x = fst y"
+      using ExState ex_logical_same.elims(2) by blast
+    then show ?case
+      by simp
+  qed
+next
+  case (ExParState s01 s02)
+  then show ?case
+  proof-
+    obtain s01' s02' where "s1 = ExParState s01' s02'" "ex_logical_same s01 s01'" "ex_logical_same s02 s02'"
+      by (metis ExParState.prems ex_logical_same.elims(2) ex_logical_same.simps(2) ex_logical_same.simps(3))
+    then have "ex_logical_same s01' s01" "ex_logical_same s02' s02"
+      using ExParState.hyps by blast+
+    then show ?thesis
+      by (simp add: \<open>s1 = ExParState s01' s02'\<close>)
+  qed
+qed
+
+
+lemma ex_logical_same_trans: 
+  assumes "ex_logical_same s0 s1"
+      and "ex_logical_same s1 s2"
+    shows "ex_logical_same s0 s2"
+  using assms
+proof(induct s0 arbitrary: s1 s2)
+  case (ExState x)
+  then show ?case
+  proof-
+    obtain y where "s1 = ExState y" "fst x = fst y"
+      using ExState ex_logical_same.elims(2) by blast
+    then obtain z where "s2 = ExState z" "fst y = fst z"
+      using ExState.prems(2) ex_logical_same.elims(2) by blast
+    then show ?thesis
+      by (simp add: \<open>fst x = fst y\<close>)
+  qed
+next
+  case (ExParState s01 s02)
+  then show ?case
+  proof-
+    obtain s01' s02' where a0: "s1 = ExParState s01' s02'" "ex_logical_same s01 s01'" "ex_logical_same s02 s02'"
+      by (metis ExParState.prems(1) ex_logical_same.simps(2) ex_logical_same.simps(4) ex_logical_same_comm exgstate.exhaust)
+    with ExParState.prems(2) obtain s01'' s02'' where a1: "s2 = ExParState s01'' s02''" "ex_logical_same s01' s01''" "ex_logical_same s02' s02''"
+      by (metis ex_logical_same.simps(2) ex_logical_same.simps(3) exgstate.exhaust)
+    with a0(2) a0(3) ExParState.hyps have "ex_logical_same s01 s01''" "ex_logical_same s02 s02''"
+      by auto
+    with a1(1) show ?thesis
+      by simp
+  qed
+qed
+
+lemma ex_sem_single: 
+  assumes "par_big_step (Single C) (ex2gstate s) l (ex2gstate s')"
+  shows "\<exists>\<sigma>\<^sub>l \<sigma>\<^sub>l' \<sigma>\<^sub>p \<sigma>\<^sub>p'. s = ExState (\<sigma>\<^sub>l, \<sigma>\<^sub>p) \<and> s' = ExState (\<sigma>\<^sub>l', \<sigma>\<^sub>p')"
+proof-
+  obtain \<sigma>\<^sub>p \<sigma>\<^sub>p' where "ex2gstate s = State \<sigma>\<^sub>p" "ex2gstate s' = State \<sigma>\<^sub>p'"
+    by (meson SingleE assms)
+  then obtain \<sigma>\<^sub>l \<sigma>\<^sub>l' where "s = ExState (\<sigma>\<^sub>l, \<sigma>\<^sub>p)" "s' = ExState (\<sigma>\<^sub>l', \<sigma>\<^sub>p')"
+    by (metis eq_fst_iff ex2gstate.simps(1) ex2gstate.simps(2) exgstate.exhaust gstate.distinct(1) gstate.inject(1) sndI)
+  then show ?thesis by auto
+qed
+
+lemma ex_sem_single_logical:
+  assumes "par_big_step (Single C) (ex2gstate s) l (ex2gstate s')" "ex_logical_same s s'"
+  shows "\<exists>\<sigma>\<^sub>l \<sigma>\<^sub>p \<sigma>\<^sub>p'. s = ExState (\<sigma>\<^sub>l, \<sigma>\<^sub>p) \<and> s' = ExState (\<sigma>\<^sub>l, \<sigma>\<^sub>p')"
+  using assms(1) assms(2) ex_sem_single by fastforce
+
+lemma ex_sem_par:
+  assumes "par_big_step (Parallel C1 chs C2) (ex2gstate s) l (ex2gstate s')"
+  shows "\<exists>s1 s2 s1' s2'. s = ExParState s1 s2 \<and> s' = ExParState s1' s2'"
+proof-
+  obtain \<sigma>1 \<sigma>2 \<sigma>1' \<sigma>2' where "ex2gstate s = ParState \<sigma>1 \<sigma>2" "ex2gstate s' = ParState \<sigma>1' \<sigma>2'"
+    by (smt (verit, best) ParallelE assms)
+  then show ?thesis
+    by (metis ex2gstate.simps(1) exgstate.exhaust gstate.distinct(1))
+qed
+
+lemma ex_sem_par_logical:
+  assumes "par_big_step (Parallel C1 chs C2) (ex2gstate s) l (ex2gstate s')" "ex_logical_same s s'"
+  shows "\<exists>s1 s2 s1' s2'. s = ExParState s1 s2 \<and> s' = ExParState s1' s2' \<and> ex_logical_same s1 s1' \<and> ex_logical_same s2 s2'"
+  using assms(1) assms(2) ex_sem_par by fastforce
+
+definition par_sem :: "pproc \<Rightarrow> (('lvar, 'lval) exgstate set) \<Rightarrow> (('lvar, 'lval) exgstate \<times> trace) set"
+  where "par_sem C S = {(s', l) |s s' l. s \<in> S \<and> par_big_step C (ex2gstate s) l (ex2gstate s') \<and> ex_logical_same s s'}"
 
 lemma in_par_sem: 
-  "\<phi> \<in> par_sem C S \<longleftrightarrow> (\<exists>s\<^sub>p l. (fst \<phi>, s\<^sub>p) \<in> S \<and> par_big_step C s\<^sub>p l (fst (snd \<phi>)) 
-  \<and> (snd (snd \<phi>)) = l)" (is "?A \<longleftrightarrow> ?B")
+  "\<phi> \<in> par_sem C S \<longleftrightarrow> (\<exists>s. s \<in> S \<and> par_big_step C (ex2gstate s) (snd \<phi>) (ex2gstate (fst \<phi>)) 
+  \<and> ex_logical_same s (fst \<phi>))" (is "?A \<longleftrightarrow> ?B")
 proof
   assume ?A
-  then obtain s\<^sub>p l where "(fst \<phi>, s\<^sub>p) \<in> S" "par_big_step C s\<^sub>p l (fst (snd \<phi>))"
+  then obtain s s' l where "s \<in> S" "par_big_step C (ex2gstate s) l (ex2gstate s')" "ex_logical_same s s'"
     using par_sem_def[of C S] by auto 
   then show ?B
     by (smt (verit, best) \<open>\<phi> \<in> par_sem C S\<close> fstI mem_Collect_eq par_sem_def sndI)
@@ -993,47 +1291,53 @@ next
     by (metis (mono_tags, lifting) mem_Collect_eq prod.collapse par_sem_def)
 qed
 
+lemma subsetPairI:
+  assumes "\<And>l \<sigma>. (l, \<sigma>) \<in> A \<Longrightarrow> (l, \<sigma>) \<in> B"
+  shows "A \<subseteq> B"
+  by (simp add: assms subrelI)
+
 lemma par_sem_single: 
-  "par_sem (Single C) S = {(s\<^sub>l, State \<sigma>\<^sub>p', l) |s\<^sub>l \<sigma>\<^sub>p \<sigma>\<^sub>p' l. (s\<^sub>l, State \<sigma>\<^sub>p) \<in> S \<and> big_step C \<sigma>\<^sub>p l \<sigma>\<^sub>p'}" (is "?A = ?B")
+  "par_sem (Single C) S = {(ExState (\<sigma>\<^sub>l, \<sigma>\<^sub>p'), l) |\<sigma>\<^sub>l \<sigma>\<^sub>p \<sigma>\<^sub>p' l. ExState (\<sigma>\<^sub>l, \<sigma>\<^sub>p) \<in> S \<and> big_step C \<sigma>\<^sub>p l \<sigma>\<^sub>p'}" (is "?A = ?B")
 proof
   show "?A \<subseteq> ?B"
-  proof(rule subsetTupleI)
-    fix s\<^sub>l s\<^sub>p' l assume "(s\<^sub>l, s\<^sub>p', l) \<in> ?A"
-    then obtain s\<^sub>p where "(s\<^sub>l, s\<^sub>p) \<in> S" "par_big_step (Single C) s\<^sub>p l s\<^sub>p'"
+  proof(rule subsetPairI)
+    fix s' l assume "(s', l) \<in> ?A"
+    then obtain s where a0: "s \<in> S" "par_big_step (Single C) (ex2gstate s) l (ex2gstate s')" "ex_logical_same s s'"
       by (metis fst_conv in_par_sem snd_conv)
-    then obtain \<sigma>\<^sub>p \<sigma>\<^sub>p' where "(s\<^sub>l, State \<sigma>\<^sub>p) \<in> S" "big_step C \<sigma>\<^sub>p l \<sigma>\<^sub>p'" "s\<^sub>p' = State \<sigma>\<^sub>p'"
-      by (metis SingleE)
-    then show "(s\<^sub>l, s\<^sub>p', l) \<in> ?B"
+    then obtain \<sigma>\<^sub>p \<sigma>\<^sub>l \<sigma>\<^sub>p' where "ExState (\<sigma>\<^sub>l, \<sigma>\<^sub>p) \<in> S" "big_step C \<sigma>\<^sub>p l \<sigma>\<^sub>p'" "s' = ExState (\<sigma>\<^sub>l, \<sigma>\<^sub>p')"
+      by (metis (no_types, lifting) SingleE ex2gstate.simps(1) ex_sem_single_logical gstate.inject(1) snd_conv)
+    then show "(s', l) \<in> ?B"
       by blast
   qed
   show "?B \<subseteq> ?A"
-  proof(rule subsetTupleI)
-    fix s\<^sub>l s\<^sub>p' l assume "(s\<^sub>l, s\<^sub>p', l) \<in> ?B"
-    then show "(s\<^sub>l, s\<^sub>p', l) \<in> ?A"
+  proof(rule subsetPairI)
+    fix s' l assume "(s', l) \<in> ?B"
+    then show "(s', l) \<in> ?A"
       using SingleB in_par_sem by fastforce
   qed
 qed
 
 lemma par_sem_parallel:
-  "par_sem (Parallel C1 chs C2) S = {(s\<^sub>l, ParState \<sigma>\<^sub>p\<^sub>1' \<sigma>\<^sub>p\<^sub>2', tr) |s\<^sub>l \<sigma>\<^sub>p\<^sub>1 \<sigma>\<^sub>p\<^sub>2 tr1 tr2 tr \<sigma>\<^sub>p\<^sub>1' \<sigma>\<^sub>p\<^sub>2'. 
-  (s\<^sub>l, ParState \<sigma>\<^sub>p\<^sub>1 \<sigma>\<^sub>p\<^sub>2) \<in> S \<and> par_big_step C1 \<sigma>\<^sub>p\<^sub>1 tr1 \<sigma>\<^sub>p\<^sub>1' \<and> par_big_step C2 \<sigma>\<^sub>p\<^sub>2 tr2 \<sigma>\<^sub>p\<^sub>2'
-  \<and> combine_blocks chs tr1 tr2 tr}" (is "?A = ?B")
+  "par_sem (Parallel C1 chs C2) S = {(ExParState s1' s2', l) |s\<^sub>l s1 s2 l1 l2 l s1' s2'. 
+  ExParState s1 s2 \<in> S \<and> par_big_step C1 (ex2gstate s1) l1 (ex2gstate s1') \<and> ex_logical_same s1 s1' \<and>
+  ex_logical_same s2 s2' \<and> par_big_step C2 (ex2gstate s2) l2 (ex2gstate s2') \<and> combine_blocks chs l1 l2 l}" (is "?A = ?B")
 proof
   show "?A \<subseteq> ?B"
-  proof(rule subsetTupleI)
-    fix s\<^sub>l s\<^sub>p' l assume "(s\<^sub>l, s\<^sub>p', l) \<in> ?A"
-    then obtain s\<^sub>p where "(s\<^sub>l, s\<^sub>p) \<in> S" "par_big_step (Parallel C1 chs C2) s\<^sub>p l s\<^sub>p'"
+  proof(rule subsetPairI)
+    fix s' l assume a0: "(s', l) \<in> ?A"
+    then obtain s where "s \<in> S" "par_big_step (Parallel C1 chs C2) (ex2gstate s) l (ex2gstate s')"
       by (metis fst_conv in_par_sem snd_conv)
-    then obtain \<sigma>\<^sub>p\<^sub>1 \<sigma>\<^sub>p\<^sub>2 tr1 tr2 \<sigma>\<^sub>p\<^sub>1' \<sigma>\<^sub>p\<^sub>2' where "(s\<^sub>l, ParState \<sigma>\<^sub>p\<^sub>1 \<sigma>\<^sub>p\<^sub>2) \<in> S" "par_big_step C1 \<sigma>\<^sub>p\<^sub>1 tr1 \<sigma>\<^sub>p\<^sub>1'"
-    "par_big_step C2 \<sigma>\<^sub>p\<^sub>2 tr2 \<sigma>\<^sub>p\<^sub>2'" "combine_blocks chs tr1 tr2 l" "s\<^sub>p' = ParState \<sigma>\<^sub>p\<^sub>1' \<sigma>\<^sub>p\<^sub>2'"
-      by (smt (verit, ccfv_SIG) ParallelE)
-    then show "(s\<^sub>l, s\<^sub>p', l) \<in> ?B"
+    with a0 obtain s1 s2 l1 l2 s1' s2' where "(ExParState s1 s2) \<in> S" "par_big_step C1 (ex2gstate s1) l1 (ex2gstate s1')"
+    "ex_logical_same s1 s1'" "ex_logical_same s2 s2'" "par_big_step C2 (ex2gstate s2) l2 (ex2gstate s2')"
+    "combine_blocks chs l1 l2 l" "s' = ExParState s1' s2'"
+      by (smt (verit, ccfv_threshold) ParallelE  ex2gstate.simps(2) ex_sem_par_logical fst_conv gstate.inject(2) in_par_sem snd_conv) 
+    then show "(s', l) \<in> ?B"
       by blast
   qed
   show "?B \<subseteq> ?A"
-  proof(rule subsetTupleI)
-    fix s\<^sub>l s\<^sub>p' l assume "(s\<^sub>l, s\<^sub>p', l) \<in> ?B"
-    then show "(s\<^sub>l, s\<^sub>p', l) \<in> ?A"
+  proof(rule subsetPairI)
+    fix s' l assume "(s', l) \<in> ?B"
+    then show "(s', l) \<in> ?A"
       using ParallelB in_par_sem by fastforce
   qed
 qed

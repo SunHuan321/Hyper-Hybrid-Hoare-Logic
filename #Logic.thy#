@@ -1337,7 +1337,9 @@ lemma complete_int_aux:
       |\<sigma>\<^sub>l \<sigma>\<^sub>p l d sl v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> \<Sigma> \<and> 0 < d \<and> ODEsol ode sl d \<and> sl 0 = \<sigma>\<^sub>p \<and> 
       (\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (sl t))})))
   n ode b es R"
-  using assms
+proof (induction n)
+  case 0
+  show ?case
 sorry
 (*
 proof(induct "length cs" arbitrary: Q cs)
