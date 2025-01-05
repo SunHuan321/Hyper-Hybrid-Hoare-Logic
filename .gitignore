@@ -1,3 +1,6 @@
 
 *.thy~
 .DS_Store
+*.thy#
+*.thy#
+\#Logic.thy\#
