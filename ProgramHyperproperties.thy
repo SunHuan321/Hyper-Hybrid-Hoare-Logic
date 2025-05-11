@@ -1,5 +1,5 @@
 theory ProgramHyperproperties
-  imports Logic
+  imports Logic "HHL/BigStepSimple" "HHL/BigStepParallel"
 begin
 
 type_synonym progran_hyperproperty = "(gstate \<times> trace \<times> gstate) set \<Rightarrow> bool"
@@ -289,7 +289,64 @@ theorem any_hht_hyperprop:
   by (smt (verit, best) Collect_cong hyperprop_hht_def hypersat_def par_hyper_hoare_triple_def 
       semify_eq_traces set_of_traces_def)
 
+subsection \<open>Encoding HHL\<close>
 
+definition HL where
+  "HL P C Q \<longleftrightarrow> (\<forall>\<sigma>\<^sub>l \<sigma>\<^sub>p \<sigma>\<^sub>p' tr0 l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> P \<and> big_step C \<sigma>\<^sub>p l \<sigma>\<^sub>p' \<longrightarrow> (\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr0 @ l) \<in> Q)"
+
+definition lift_assn :: "assn \<Rightarrow> ('lvar, 'lval) exstate set" where
+  "lift_assn P \<equiv> {(l, s, tr). P s tr}"
+
+lemma HL_encode_triple: "\<Turnstile>\<^sub>H\<^sub>L {P} C {Q} \<longleftrightarrow> HL (lift_assn P) C (lift_assn Q)" (is "?A \<longleftrightarrow> ?B")
+  apply (simp add: HL_def Valid_def lift_assn_def)
+  by blast
+
+lemma HLI:
+  assumes "\<And>\<sigma>\<^sub>l \<sigma>\<^sub>p \<sigma>\<^sub>p' tr0 l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> P \<Longrightarrow> big_step C \<sigma>\<^sub>p l \<sigma>\<^sub>p' \<Longrightarrow> (\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr0 @ l) \<in> Q"
+  shows "HL P C Q"
+  using assms HL_def[of P C Q] by blast
+
+theorem encoding_HL:
+  "HL P C Q \<longleftrightarrow> (hyper_hoare_triple (over_approx P) C (over_approx Q))" (is "?A \<longleftrightarrow> ?B")
+proof (rule iffI)
+  show "?B \<Longrightarrow> ?A"
+  proof -
+    assume asm0: ?B
+    show ?A
+    proof (rule HLI)
+      fix \<sigma>\<^sub>l \<sigma>\<^sub>p \<sigma>\<^sub>p' tr0 l
+      assume asm1: "(\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> P" "big_step C \<sigma>\<^sub>p l \<sigma>\<^sub>p'"
+      then have "over_approx P {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0)}"
+        by (simp add: over_approx_def)
+      then have "(over_approx Q) (sem C {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0)})"
+        using asm0 hyper_hoare_tripleE by auto
+      then show "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr0 @ l) \<in> Q"
+        by (simp add: asm1(2) in_mono in_sem over_approx_def)
+    qed
+  qed
+next
+  assume r: ?A
+  show ?B
+  proof (rule hyper_hoare_tripleI)
+    fix S assume asm0: "over_approx P S"
+    then have "S \<subseteq> P"
+      by (simp add: over_approx_def)
+    then have "sem C S \<subseteq> sem C P"
+      by (simp add: sem_monotonic)
+    then have "sem C S \<subseteq> Q"
+      using r HL_def[of P C Q]
+      by (smt (verit, best) in_sem split_pairs subset_iff)     
+    then show "over_approx Q (sem C S)"
+      by (simp add: over_approx_def)
+  qed
+qed
+
+theorem encoding_HL_triple:
+  "\<Turnstile>\<^sub>H\<^sub>L {P} C {Q} \<longleftrightarrow> (\<Turnstile> {over_approx (lift_assn P)} C {over_approx (lift_assn Q)})" (is "?A \<longleftrightarrow> ?B")
+  using HL_encode_triple[of P C Q] encoding_HL[of "lift_assn P" C "lift_assn Q"]
+  by auto
+
+end
 
 
 

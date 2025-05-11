@@ -191,9 +191,9 @@ subsection \<open>Soundness\<close>
 
 text \<open>Hyper-Triples\<close>
 
-type_synonym ('lvar, 'lval) conf = "('lvar \<Rightarrow> 'lval) \<times> state \<times> trace"
-type_synonym ('lvar, 'lval) assn = "('lvar, 'lval)conf set \<Rightarrow> bool"
-type_synonym ('lvar, 'lval) ass = "(('lvar \<Rightarrow> 'lval) \<times> state) set \<Rightarrow> bool"
+type_synonym ('lvar, 'lval) exstate = "('lvar \<Rightarrow> 'lval) \<times> state \<times> trace"
+type_synonym ('lvar, 'lval) hyper_assn = "('lvar, 'lval) exstate set \<Rightarrow> bool"
+type_synonym ('lvar, 'lval) hyper_ass = "(('lvar \<Rightarrow> 'lval) \<times> state) set \<Rightarrow> bool"
 
 definition hyper_hoare_triple ("\<Turnstile> {_} _ {_}" [51,0,0] 81) where
   "\<Turnstile> {P} C {Q} \<longleftrightarrow> (\<forall>S. P S \<longrightarrow> Q (sem C S))"
@@ -388,8 +388,8 @@ proof(rule hyper_hoare_tripleI)
     by (metis (mono_tags, lifting) sem_ode)
 qed
 
-inductive hoare :: "('lvar, 'lval) assn \<Rightarrow> proc \<Rightarrow> ('lvar, 'lval) assn \<Rightarrow> bool" ("\<turnstile> ({(1_)}/ (_)/ {(1_)})" 50) 
-  and interrupt_hoare :: "('lvar, 'lval) assn \<Rightarrow> nat \<Rightarrow> ODE \<Rightarrow> fform \<Rightarrow> (comm \<times> proc) list \<Rightarrow> ('lvar, 'lval) assn \<Rightarrow> bool" where
+inductive hoare :: "('lvar, 'lval) hyper_assn \<Rightarrow> proc \<Rightarrow> ('lvar, 'lval) hyper_assn \<Rightarrow> bool" ("\<turnstile> ({(1_)}/ (_)/ {(1_)})" 50) 
+  and interrupt_hoare :: "('lvar, 'lval) hyper_assn \<Rightarrow> nat \<Rightarrow> ODE \<Rightarrow> fform \<Rightarrow> (comm \<times> proc) list \<Rightarrow> ('lvar, 'lval) hyper_assn \<Rightarrow> bool" where
   SkipH: "\<turnstile> {P} Skip {P}"                                               
 | ConsH: "\<lbrakk>entails P P'; entails Q' Q; \<turnstile> {P'} C {Q'}\<rbrakk> \<Longrightarrow> \<turnstile> {P} C {Q}" 
 | AssignH: "\<turnstile> {(\<lambda>S. P {(\<sigma>\<^sub>l, \<sigma>\<^sub>p(x := e \<sigma>\<^sub>p), l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S })} (Assign x e) {P}" 
@@ -424,9 +424,9 @@ inductive hoare :: "('lvar, 'lval) assn \<Rightarrow> proc \<Rightarrow> ('lvar,
 | InterruptH4: "\<lbrakk>entails P P'; entails Q' Q;interrupt_hoare P' n ode b cs Q'\<rbrakk> \<Longrightarrow> 
                 interrupt_hoare P n ode b cs Q"
 | InterruptH5: "interrupt_hoare P (length cs) ode b cs Q \<Longrightarrow> \<turnstile> {P} Interrupt ode b cs {Q}"
-| InterruptH6: "\<lbrakk>\<And>x::('lvar, 'lval)conf set. interrupt_hoare (P x) n ode b cs (Q x)\<rbrakk> \<Longrightarrow> 
+| InterruptH6: "\<lbrakk>\<And>x::('lvar, 'lval) exstate set. interrupt_hoare (P x) n ode b cs (Q x)\<rbrakk> \<Longrightarrow> 
                  interrupt_hoare (exists P) n ode b cs (exists Q)"
-| ExistsH: "\<lbrakk>\<And>x::('lvar, 'lval)conf set. \<turnstile> {P x} C {Q x}\<rbrakk> \<Longrightarrow> \<turnstile> {exists P} C {exists Q}"
+| ExistsH: "\<lbrakk>\<And>x::('lvar, 'lval) exstate set. \<turnstile> {P x} C {Q x}\<rbrakk> \<Longrightarrow> \<turnstile> {exists P} C {exists Q}"
 
 inductive big_step_interrupt :: "nat \<Rightarrow> ODE \<Rightarrow> fform \<Rightarrow> (comm \<times> proc) list \<Rightarrow> state \<Rightarrow> trace \<Rightarrow> state \<Rightarrow> bool" where
   "i < n \<Longrightarrow> cs ! i = (Send ch e, p2) \<Longrightarrow>
@@ -469,7 +469,7 @@ lemma big_step_Suc_impl:
   by (simp add: big_step_interrupt.intros(6))
            
 
-definition sem_interrupt :: "nat \<Rightarrow> ODE \<Rightarrow> fform \<Rightarrow> (comm \<times> proc) list \<Rightarrow> ('lvar, 'lval)conf set \<Rightarrow> ('lvar, 'lval)conf set"
+definition sem_interrupt :: "nat \<Rightarrow> ODE \<Rightarrow> fform \<Rightarrow> (comm \<times> proc) list \<Rightarrow> ('lvar, 'lval) exstate set \<Rightarrow> ('lvar, 'lval) exstate set"
   where "sem_interrupt n ode b cs \<Sigma> = {(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l @ l') |\<sigma>\<^sub>l \<sigma>\<^sub>p \<sigma>\<^sub>p' l l'. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> \<Sigma> \<and> 
                                         big_step_interrupt n ode b cs \<sigma>\<^sub>p l' \<sigma>\<^sub>p'}"
 
@@ -817,13 +817,13 @@ next
   qed
 qed
 
-definition int_no_comm_trace :: "ODE \<Rightarrow> fform \<Rightarrow> (comm \<times> proc) list \<Rightarrow> ('lvar, 'lval)conf set \<Rightarrow> ('lvar, 'lval)conf set"
+definition int_no_comm_trace :: "ODE \<Rightarrow> fform \<Rightarrow> (comm \<times> proc) list \<Rightarrow> ('lvar, 'lval) exstate set \<Rightarrow> ('lvar, 'lval) exstate set"
   where "int_no_comm_trace ode b cs S = {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S \<and> \<not> b \<sigma>\<^sub>p} \<union>
    {(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr0 @ [WaitBlk d (\<lambda> \<tau>. State (sl \<tau>)) (rdy_of_echoice cs)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p tr0 d sl \<sigma>\<^sub>p'. 
    (\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> S \<and> d > 0 \<and> ODEsol ode sl d \<and> (\<forall>t. t \<ge> 0 \<and> t < d \<longrightarrow> b (sl t)) \<and> 
    \<not> b (sl d) \<and> sl 0 = \<sigma>\<^sub>p \<and> sl d = \<sigma>\<^sub>p'}"
 
-definition int_comm_trace :: "nat \<Rightarrow> ODE \<Rightarrow> fform \<Rightarrow> (comm \<times> proc) list \<Rightarrow> ('lvar, 'lval)conf set \<Rightarrow> ('lvar, 'lval)conf set"
+definition int_comm_trace :: "nat \<Rightarrow> ODE \<Rightarrow> fform \<Rightarrow> (comm \<times> proc) list \<Rightarrow> ('lvar, 'lval) exstate set \<Rightarrow> ('lvar, 'lval) exstate set"
   where "int_comm_trace n ode b cs S = {(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr0 @ OutBlock ch (e \<sigma>\<^sub>p) # tr1) |\<sigma>\<^sub>l \<sigma>\<^sub>p tr0 i ch e p tr1 \<sigma>\<^sub>p'. 
   (\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> S \<and> i < n \<and> cs ! i = (Send ch e, p) \<and> big_step p \<sigma>\<^sub>p tr1 \<sigma>\<^sub>p'} \<union>
    {(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr0 @ (WaitBlk d (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs) # OutBlock ch (e (sl d)) # tr1)) 
@@ -837,7 +837,7 @@ definition int_comm_trace :: "nat \<Rightarrow> ODE \<Rightarrow> fform \<Righta
     big_step p ((sl d)(var := v)) tr1 \<sigma>\<^sub>p'}"
 
 definition int_send_trace :: "ODE \<Rightarrow> fform \<Rightarrow> (comm \<times> proc) list \<Rightarrow> proc \<Rightarrow> cname \<Rightarrow> exp \<Rightarrow> 
-                              ('lvar, 'lval)conf set \<Rightarrow> ('lvar, 'lval)conf set"
+                              ('lvar, 'lval) exstate set \<Rightarrow> ('lvar, 'lval) exstate set"
   where "int_send_trace ode b cs C ch e S = {(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr0 @ OutBlock ch (e \<sigma>\<^sub>p) # tr1) 
   |\<sigma>\<^sub>l \<sigma>\<^sub>p tr0 tr1 \<sigma>\<^sub>p'. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> S \<and> big_step C \<sigma>\<^sub>p tr1 \<sigma>\<^sub>p'} \<union>
   {(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr0 @ (WaitBlk d (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs) # OutBlock ch (e (sl d)) # tr1)) 
@@ -845,7 +845,7 @@ definition int_send_trace :: "ODE \<Rightarrow> fform \<Rightarrow> (comm \<time
    (\<forall>t. t \<ge> 0 \<and> t < d \<longrightarrow> b (sl t)) \<and> big_step C (sl d) tr1 \<sigma>\<^sub>p'}"
 
 definition int_recv_trace :: "ODE \<Rightarrow> fform \<Rightarrow> (comm \<times> proc) list \<Rightarrow> proc \<Rightarrow> cname \<Rightarrow> var \<Rightarrow> 
-                              ('lvar, 'lval)conf set \<Rightarrow> ('lvar, 'lval)conf set"
+                              ('lvar, 'lval) exstate set \<Rightarrow> ('lvar, 'lval) exstate set"
   where "int_recv_trace ode b cs C ch var S = {(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr0 @ InBlock ch v # tr1) 
   |\<sigma>\<^sub>l \<sigma>\<^sub>p tr0 tr1 \<sigma>\<^sub>p' v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> S \<and> big_step C (\<sigma>\<^sub>p(var := v)) tr1 \<sigma>\<^sub>p'} \<union>
   {(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr0 @ (WaitBlk d (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs) # InBlock ch v # tr1)) 
@@ -1096,7 +1096,7 @@ lemma sem_interrupt_final:
   "sem_interrupt (length cs) ode b cs \<Sigma> = sem (Interrupt ode b cs) \<Sigma>"
   by (simp add: sem_interrupt_def sem_def big_step_interrupt_final)
   
-definition interrupt_Valid :: "('lvar, 'lval) assn \<Rightarrow> nat \<Rightarrow> ODE \<Rightarrow> fform \<Rightarrow> (comm \<times> proc) list \<Rightarrow> ('lvar, 'lval) assn \<Rightarrow> bool" where
+definition interrupt_Valid :: "('lvar, 'lval) hyper_assn \<Rightarrow> nat \<Rightarrow> ODE \<Rightarrow> fform \<Rightarrow> (comm \<times> proc) list \<Rightarrow> ('lvar, 'lval) hyper_assn \<Rightarrow> bool" where
   "interrupt_Valid P n ode b cs Q \<longleftrightarrow> (\<forall>\<Sigma>. P \<Sigma> \<longrightarrow> Q (sem_interrupt n ode b cs \<Sigma>))"
 
 
@@ -1274,9 +1274,9 @@ proof (rule entailsI)
 qed
 
 lemma complete_ichoice:
-  fixes P Q :: "('lvar, 'lval) assn"
-  assumes "\<And>P1 Q1 :: ('lvar, 'lval) assn. complete P1 C1 Q1"
-      and "\<And>P2 Q2 :: ('lvar, 'lval) assn. complete P2 C2 Q2"
+  fixes P Q :: "('lvar, 'lval) hyper_assn"
+  assumes "\<And>P1 Q1 :: ('lvar, 'lval) hyper_assn. complete P1 C1 Q1"
+      and "\<And>P2 Q2 :: ('lvar, 'lval) hyper_assn. complete P2 C2 Q2"
     shows "complete P (IChoice C1 C2) Q"
 proof (rule completeI)
   assume asm0: "\<Turnstile> {P} IChoice C1 C2 {Q}"
@@ -1427,8 +1427,8 @@ proof (rule entailsI)
 qed
 
 lemma complete_while:
-  fixes P Q :: "('lvar, 'lval) conf set \<Rightarrow> bool"
-  assumes "\<And>P' Q' :: ('lvar, 'lval) conf set \<Rightarrow> bool. complete P' C Q'"
+  fixes P Q :: "('lvar, 'lval) exstate set \<Rightarrow> bool"
+  assumes "\<And>P' Q' :: ('lvar, 'lval) exstate set \<Rightarrow> bool. complete P' C Q'"
     shows "complete P (Rep C) Q"
 proof (rule completeI)
   assume asm0: "hyper_hoare_triple P (Rep C) Q"
@@ -1573,10 +1573,10 @@ lemma int_trace_same:
   by auto
 
 lemma complete_int_aux:
-  fixes P Q :: "('lvar, 'lval) conf set \<Rightarrow> bool"
+  fixes P Q :: "('lvar, 'lval) exstate set \<Rightarrow> bool"
   assumes "\<forall>S. P S \<longrightarrow> Q (int_no_comm_trace ode b cs S \<union> int_comm_trace n ode b cs S)"
     and "n \<le> length cs"
-    and "\<And>P Q :: ('lvar, 'lval) conf set \<Rightarrow> bool. \<And>e. e \<in> set cs \<Longrightarrow> \<Turnstile> {P} snd e {Q} \<Longrightarrow> \<turnstile> {P} snd e {Q}"
+    and "\<And>P Q :: ('lvar, 'lval) exstate set \<Rightarrow> bool. \<And>e. e \<in> set cs \<Longrightarrow> \<Turnstile> {P} snd e {Q} \<Longrightarrow> \<turnstile> {P} snd e {Q}"
   shows "interrupt_hoare P n ode b cs Q"
   using assms(1) assms(2)
 proof(induct n arbitrary: P Q)
@@ -1702,15 +1702,15 @@ next
 qed
 
 lemma complete_int:
-  fixes P Q :: "('lvar, 'lval) assn"
+  fixes P Q :: "('lvar, 'lval) hyper_assn"
   assumes "\<Turnstile> {P} Interrupt ode b cs {Q}"
-    and "\<And>P Q :: ('lvar, 'lval) assn. \<And>e. e \<in> set cs \<Longrightarrow> \<Turnstile> {P} snd e {Q} \<Longrightarrow> \<turnstile> {P} snd e {Q}"
+    and "\<And>P Q :: ('lvar, 'lval) hyper_assn. \<And>e. e \<in> set cs \<Longrightarrow> \<Turnstile> {P} snd e {Q} \<Longrightarrow> \<turnstile> {P} snd e {Q}"
   shows "interrupt_hoare P (length cs) ode b cs Q"
   using assms complete_int_aux[of P Q ode b cs "length cs"]
   by (simp add: hyper_hoare_tripleE int_trace_same)
 
 theorem completeness:
-  fixes P Q :: "('lvar, 'lval) assn"
+  fixes P Q :: "('lvar, 'lval) hyper_assn"
   assumes "\<Turnstile> {P} C {Q}"
   shows "\<turnstile> {P} C {Q}"
   using assms
@@ -1963,28 +1963,28 @@ lemma combine_blocks_emptyE3' [sync_elims]:
   by (induct rule: combine_blocks.cases, auto)
 
 text \<open>Assertion on global state\<close>
-type_synonym ('lvar, 'lval) gs_assn = " ('lvar, 'lval) exgstate set \<Rightarrow> bool"
+type_synonym ('lvar, 'lval) gs_hyper_assn = " ('lvar, 'lval) exgstate set \<Rightarrow> bool"
 
 text \<open>Assertion on global state and trace\<close>
-type_synonym ('lvar, 'lval) gassn = "(('lvar, 'lval) exgstate \<times> trace) set \<Rightarrow> bool"
+type_synonym ('lvar, 'lval) ghyper_assn = "(('lvar, 'lval) exgstate \<times> trace) set \<Rightarrow> bool"
 
 definition par_hyper_hoare_triple ("\<Turnstile>\<^sub>P {_} _ {_}" [51,0,0] 81) where
   "\<Turnstile>\<^sub>P {P} C {Q} \<longleftrightarrow> (\<forall>S. P S \<longrightarrow> Q (par_sem C S))"
 
-definition emp_trace_assn :: "('lvar, 'lval) ass \<Rightarrow> ('lvar, 'lval) assn"
-  where "emp_trace_assn P \<Sigma> \<longleftrightarrow> (\<exists>S. P S \<and> \<Sigma> = {(\<sigma>\<^sub>p, \<sigma>\<^sub>l, []) |\<sigma>\<^sub>p \<sigma>\<^sub>l. (\<sigma>\<^sub>p, \<sigma>\<^sub>l) \<in> S})"
+definition emp_trace_hyper_assn :: "('lvar, 'lval) hyper_ass \<Rightarrow> ('lvar, 'lval) hyper_assn"
+  where "emp_trace_hyper_assn P \<Sigma> \<longleftrightarrow> (\<exists>S. P S \<and> \<Sigma> = {(\<sigma>\<^sub>p, \<sigma>\<^sub>l, []) |\<sigma>\<^sub>p \<sigma>\<^sub>l. (\<sigma>\<^sub>p, \<sigma>\<^sub>l) \<in> S})"
 
-definition sing_assn :: "('lvar, 'lval) ass \<Rightarrow> ('lvar, 'lval) gs_assn"
-  where "sing_assn P S \<longleftrightarrow> (\<exists>S'. P S' \<and> S = {ExState (\<sigma>\<^sub>l, \<sigma>\<^sub>p) |\<sigma>\<^sub>l \<sigma>\<^sub>p. (\<sigma>\<^sub>l, \<sigma>\<^sub>p) \<in> S'})"
+definition sing_hyper_assn :: "('lvar, 'lval) hyper_ass \<Rightarrow> ('lvar, 'lval) gs_hyper_assn"
+  where "sing_hyper_assn P S \<longleftrightarrow> (\<exists>S'. P S' \<and> S = {ExState (\<sigma>\<^sub>l, \<sigma>\<^sub>p) |\<sigma>\<^sub>l \<sigma>\<^sub>p. (\<sigma>\<^sub>l, \<sigma>\<^sub>p) \<in> S'})"
 
-definition sing_gassn :: "('lvar, 'lval) assn \<Rightarrow> ('lvar, 'lval) gassn"
-  where "sing_gassn P S = (\<exists>S'. P S' \<and> S = {(ExState (\<sigma>\<^sub>l, \<sigma>\<^sub>p), l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S'})"
+definition sing_ghyper_assn :: "('lvar, 'lval) hyper_assn \<Rightarrow> ('lvar, 'lval) ghyper_assn"
+  where "sing_ghyper_assn P S = (\<exists>S'. P S' \<and> S = {(ExState (\<sigma>\<^sub>l, \<sigma>\<^sub>p), l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S'})"
 
-definition par_assn :: "('lvar, 'lval) gs_assn \<Rightarrow> ('lvar, 'lval) gs_assn \<Rightarrow> ('lvar, 'lval) gs_assn"
-  where "par_assn P1 P2 S \<longleftrightarrow> (\<exists>S1 S2. P1 S1 \<and> P2 S2 \<and> S = {ExParState s1 s2 |s1 s2. s1 \<in> S1 \<and> s2 \<in> S2})"
+definition par_hyper_assn :: "('lvar, 'lval) gs_hyper_assn \<Rightarrow> ('lvar, 'lval) gs_hyper_assn \<Rightarrow> ('lvar, 'lval) gs_hyper_assn"
+  where "par_hyper_assn P1 P2 S \<longleftrightarrow> (\<exists>S1 S2. P1 S1 \<and> P2 S2 \<and> S = {ExParState s1 s2 |s1 s2. s1 \<in> S1 \<and> s2 \<in> S2})"
 
-definition sync_gassn :: "cname set \<Rightarrow> ('lvar, 'lval) gassn \<Rightarrow> ('lvar, 'lval) gassn \<Rightarrow> ('lvar, 'lval) gassn"
-  where "sync_gassn chs P1 P2 S \<longleftrightarrow> (\<exists>S1 S2. P1 S1 \<and> P2 S2 \<and> S = 
+definition sync_ghyper_assn :: "cname set \<Rightarrow> ('lvar, 'lval) ghyper_assn \<Rightarrow> ('lvar, 'lval) ghyper_assn \<Rightarrow> ('lvar, 'lval) ghyper_assn"
+  where "sync_ghyper_assn chs P1 P2 S \<longleftrightarrow> (\<exists>S1 S2. P1 S1 \<and> P2 S2 \<and> S = 
   {(ExParState s1 s2, l) |s1 s2 l1 l2 l. (s1, l1) \<in> S1 \<and> (s2, l2) \<in> S2 \<and> combine_blocks chs l1 l2 l})"
 
 lemma par_hyper_hoare_tripleI:
@@ -2007,47 +2007,47 @@ lemma par_consequence_rule:
   by (metis (no_types, opaque_lifting) assms(1) assms(2) assms(3) entails_def par_hyper_hoare_triple_def)
 
 lemma rule_par_single:
-  assumes "\<Turnstile> {emp_trace_assn P} C {Q}"
-  shows "\<Turnstile>\<^sub>P {sing_assn P} (Single C) {sing_gassn Q}"
+  assumes "\<Turnstile> {emp_trace_hyper_assn P} C {Q}"
+  shows "\<Turnstile>\<^sub>P {sing_hyper_assn P} (Single C) {sing_ghyper_assn Q}"
 proof(rule par_hyper_hoare_tripleI)
   fix S
-  assume assm: "sing_assn P S"
+  assume assm: "sing_hyper_assn P S"
   then obtain S' where a0: "P S'" "S = {ExState (\<sigma>\<^sub>l, \<sigma>\<^sub>p) |\<sigma>\<^sub>l \<sigma>\<^sub>p. (\<sigma>\<^sub>l, \<sigma>\<^sub>p) \<in> S'}"
-    by (smt (verit) sing_assn_def)
+    by (smt (verit) sing_hyper_assn_def)
   let ?S = "{(\<sigma>\<^sub>l, \<sigma>\<^sub>p, []) |\<sigma>\<^sub>l \<sigma>\<^sub>p. (\<sigma>\<^sub>l, \<sigma>\<^sub>p) \<in> S'}"
-  from a0(1) have "emp_trace_assn P ?S"
-    using emp_trace_assn_def by auto
+  from a0(1) have "emp_trace_hyper_assn P ?S"
+    using emp_trace_hyper_assn_def by auto
   with assms have a1: "Q (sem C ?S)"
     using hyper_hoare_tripleE by blast
   from a0(2) have "par_sem (Single C) S = {(ExState (\<sigma>\<^sub>l, \<sigma>\<^sub>p'), l) |\<sigma>\<^sub>l \<sigma>\<^sub>p' l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p', l) \<in> sem C ?S}"
     by (simp add: par_sem_single)
-  with a1 show "sing_gassn Q (par_sem (Single C) S)"
-    using sing_gassn_def by fastforce
+  with a1 show "sing_ghyper_assn Q (par_sem (Single C) S)"
+    using sing_ghyper_assn_def by fastforce
 qed
 
 
 lemma rule_par_Parallel:
   assumes "\<Turnstile>\<^sub>P {P1} C1 {Q1}"
       and "\<Turnstile>\<^sub>P {P2} C2 {Q2}"
-    shows "\<Turnstile>\<^sub>P {par_assn P1 P2} Parallel C1 chs C2 {sync_gassn chs Q1 Q2}"
+    shows "\<Turnstile>\<^sub>P {par_hyper_assn P1 P2} Parallel C1 chs C2 {sync_ghyper_assn chs Q1 Q2}"
 proof(rule par_hyper_hoare_tripleI)
   fix S
-  assume "par_assn P1 P2 S"
+  assume "par_hyper_assn P1 P2 S"
   then obtain S1 S2 where asm0: "P1 S1" "P2 S2" "S = {ExParState s1 s2 |s1 s2. s1 \<in> S1 \<and> s2 \<in> S2}"
-    by (smt (verit, best) par_assn_def)
+    by (smt (verit, best) par_hyper_assn_def)
   then have asm1: "par_sem (Parallel C1 chs C2) S = {(ExParState s1 s2, l) |s1 s2 l1 l2 l. 
   (s1, l1) \<in> par_sem C1 S1 \<and> (s2, l2) \<in> par_sem C2 S2 \<and> combine_blocks chs l1 l2 l}"
     using par_sem_parallel[of C1 chs C2 S1 S2] by auto
   from assms asm0 have "Q1 (par_sem C1 S1)" "Q2 (par_sem C2 S2)"
     using par_hyper_hoare_tripleE by blast+
-  with asm1 asm0 show "sync_gassn chs Q1 Q2 (par_sem (Parallel C1 chs C2) S)"
-    apply (simp add: sync_gassn_def)
+  with asm1 asm0 show "sync_ghyper_assn chs Q1 Q2 (par_sem (Parallel C1 chs C2) S)"
+    apply (simp add: sync_ghyper_assn_def)
     by blast
 qed
 
-inductive par_hoare :: "('lvar, 'lval) gs_assn \<Rightarrow> pproc \<Rightarrow> ('lvar, 'lval)gassn \<Rightarrow> bool" ("\<turnstile>\<^sub>p ({(1_)}/ (_)/ {(1_)})" 50) where
-  Single: "\<turnstile> {emp_trace_assn P} C {Q} \<Longrightarrow> \<turnstile>\<^sub>p {sing_assn P} (Single C) {sing_gassn Q}"
-| Par: "\<turnstile>\<^sub>p {P1} C1 {Q1} \<Longrightarrow> \<turnstile>\<^sub>p {P2} C2 {Q2} \<Longrightarrow>  \<turnstile>\<^sub>p {par_assn P1 P2} (Parallel C1 chs C2) {sync_gassn chs Q1 Q2}"
+inductive par_hoare :: "('lvar, 'lval) gs_hyper_assn \<Rightarrow> pproc \<Rightarrow> ('lvar, 'lval)ghyper_assn \<Rightarrow> bool" ("\<turnstile>\<^sub>p ({(1_)}/ (_)/ {(1_)})" 50) where
+  Single: "\<turnstile> {emp_trace_hyper_assn P} C {Q} \<Longrightarrow> \<turnstile>\<^sub>p {sing_hyper_assn P} (Single C) {sing_ghyper_assn Q}"
+| Par: "\<turnstile>\<^sub>p {P1} C1 {Q1} \<Longrightarrow> \<turnstile>\<^sub>p {P2} C2 {Q2} \<Longrightarrow>  \<turnstile>\<^sub>p {par_hyper_assn P1 P2} (Parallel C1 chs C2) {sync_ghyper_assn chs Q1 Q2}"
 | Cons: "\<lbrakk>entails P P'; entails Q' Q; \<turnstile>\<^sub>p {P'} C {Q'}\<rbrakk> \<Longrightarrow> \<turnstile>\<^sub>p {P} C {Q}"
 
 theorem par_hoare_sound:
@@ -2066,38 +2066,38 @@ next
     by (simp add: par_consequence_rule)
 qed
 
-inductive wf_pre :: "pproc \<Rightarrow> ('lvar, 'lval) gs_assn \<Rightarrow> bool" where
-  "wf_pre (Single c) (sing_assn P)"
-| "wf_pre C1 P1 \<Longrightarrow> wf_pre C2 P2 \<Longrightarrow> wf_pre (Parallel C1 chs C2) (par_assn P1 P2)"
+inductive wf_pre :: "pproc \<Rightarrow> ('lvar, 'lval) gs_hyper_assn \<Rightarrow> bool" where
+  "wf_pre (Single c) (sing_hyper_assn P)"
+| "wf_pre C1 P1 \<Longrightarrow> wf_pre C2 P2 \<Longrightarrow> wf_pre (Parallel C1 chs C2) (par_hyper_assn P1 P2)"
 
 inductive_cases wf_pre_Single: "wf_pre (Single c) P"
 inductive_cases wf_pre_Parallel: "wf_pre (Parallel p1 chs p2) P"
 
-thm sing_assn_def
+thm sing_hyper_assn_def
 lemma complete_single: 
-  assumes "\<Turnstile>\<^sub>P {sing_assn P} Single C {Q}"
-  shows "\<turnstile>\<^sub>p {sing_assn P} Single C {Q}"
+  assumes "\<Turnstile>\<^sub>P {sing_hyper_assn P} Single C {Q}"
+  shows "\<turnstile>\<^sub>p {sing_hyper_assn P} Single C {Q}"
 proof(rule Cons)
-  let ?Q = "\<lambda>S'. \<exists>S. emp_trace_assn P S \<and> S' = sem C S"
-  show "\<turnstile>\<^sub>p {sing_assn P} Single C {sing_gassn ?Q}"
+  let ?Q = "\<lambda>S'. \<exists>S. emp_trace_hyper_assn P S \<and> S' = sem C S"
+  show "\<turnstile>\<^sub>p {sing_hyper_assn P} Single C {sing_ghyper_assn ?Q}"
   proof(rule Single)
-    have "\<Turnstile> {emp_trace_assn P} C {\<lambda>S'. \<exists>S. emp_trace_assn P S \<and> S' = sem C S}"
+    have "\<Turnstile> {emp_trace_hyper_assn P} C {\<lambda>S'. \<exists>S. emp_trace_hyper_assn P S \<and> S' = sem C S}"
       using hyper_hoare_triple_def by blast
-    then show "\<turnstile> {emp_trace_assn P} C {\<lambda>S'. \<exists>S. emp_trace_assn P S \<and> S' = sem C S}"
+    then show "\<turnstile> {emp_trace_hyper_assn P} C {\<lambda>S'. \<exists>S. emp_trace_hyper_assn P S \<and> S' = sem C S}"
       by (simp add: completeness)
   qed
-  show "entails (sing_assn P) (sing_assn P)"
+  show "entails (sing_hyper_assn P) (sing_hyper_assn P)"
     using entails_refl by blast
-  show "entails (sing_gassn (\<lambda>S'. \<exists>S. emp_trace_assn P S \<and> S' = sem C S)) Q"
+  show "entails (sing_ghyper_assn (\<lambda>S'. \<exists>S. emp_trace_hyper_assn P S \<and> S' = sem C S)) Q"
   proof(rule entailsI)
     fix S
-    assume "sing_gassn (\<lambda>S'. \<exists>S. emp_trace_assn P S \<and> S' = sem C S) S"
+    assume "sing_ghyper_assn (\<lambda>S'. \<exists>S. emp_trace_hyper_assn P S \<and> S' = sem C S) S"
     then obtain S' S'' where a0: "P S'" "S'' = {(\<sigma>\<^sub>p, \<sigma>\<^sub>l, []) |\<sigma>\<^sub>p \<sigma>\<^sub>l. (\<sigma>\<^sub>p, \<sigma>\<^sub>l) \<in> S'}"
     "S = {(ExState (\<sigma>\<^sub>l, \<sigma>\<^sub>p), l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> sem C S''}"
-      by (smt (verit, best) emp_trace_assn_def Collect_cong sing_gassn_def)
+      by (smt (verit, best) emp_trace_hyper_assn_def Collect_cong sing_ghyper_assn_def)
     let ?S = "{ExState (\<sigma>\<^sub>l, \<sigma>\<^sub>p) |\<sigma>\<^sub>l \<sigma>\<^sub>p. (\<sigma>\<^sub>l, \<sigma>\<^sub>p) \<in> S'}"
-    from a0(1) have "sing_assn P ?S"
-      using a0(1) sing_assn_def by auto
+    from a0(1) have "sing_hyper_assn P ?S"
+      using a0(1) sing_hyper_assn_def by auto
     with assms have "Q (par_sem (Single C) ?S)"
       using par_hyper_hoare_tripleE by blast
     with a0 show "Q S"
@@ -2113,7 +2113,7 @@ proof(induct C arbitrary: P Q)
     by (metis complete_single wf_pre_Single)
 next
   case (Parallel C1 chs C2)
-  then obtain P1 P2 where asm0: "P = par_assn P1 P2" "wf_pre C1 P1" "wf_pre C2 P2"
+  then obtain P1 P2 where asm0: "P = par_hyper_assn P1 P2" "wf_pre C1 P1" "wf_pre C2 P2"
     by (meson wf_pre_Parallel)
   show "\<turnstile>\<^sub>p {P} Parallel C1 chs C2 {Q}"
   proof(rule Cons)
@@ -2123,19 +2123,19 @@ next
       using par_hyper_hoare_triple_def by blast+
     with asm0(1) asm0(2) asm0(3) Parallel.hyps(1) Parallel.hyps(2) have "\<turnstile>\<^sub>p {P1} C1 {?Q1}" "\<turnstile>\<^sub>p {P2} C2 {?Q2}"
       by blast+
-    then show "\<turnstile>\<^sub>p {par_assn P1 P2} Parallel C1 chs C2 {sync_gassn chs ?Q1 ?Q2}"
+    then show "\<turnstile>\<^sub>p {par_hyper_assn P1 P2} Parallel C1 chs C2 {sync_ghyper_assn chs ?Q1 ?Q2}"
       by (simp add: Par)
-    from asm0(1) show "entails P (par_assn P1 P2)"
+    from asm0(1) show "entails P (par_hyper_assn P1 P2)"
       using entails_refl by blast
-    show "entails (sync_gassn chs ?Q1 ?Q2) Q"
+    show "entails (sync_ghyper_assn chs ?Q1 ?Q2) Q"
     proof(rule entailsI)
       fix S
-      assume "sync_gassn chs ?Q1 ?Q2 S"
+      assume "sync_ghyper_assn chs ?Q1 ?Q2 S"
       then obtain S1 S2 where asm1: "P1 S1" "P2 S2" "S = {(ExParState s1 s2, l) |s1 s2 l1 l2 l. 
       (s1, l1) \<in> par_sem C1 S1 \<and> (s2, l2) \<in> par_sem C2 S2 \<and> combine_blocks chs l1 l2 l}"
-        using sync_gassn_def[of chs ?Q1 ?Q2] by auto
+        using sync_ghyper_assn_def[of chs ?Q1 ?Q2] by auto
       with asm0(1) have "P {ExParState s1 s2 |s1 s2. s1 \<in> S1 \<and> s2 \<in> S2}"
-        apply (simp add: par_assn_def) by auto
+        apply (simp add: par_hyper_assn_def) by auto
       with asm1(3) Parallel.prems(2) show "Q S"
         using par_sem_parallel[of C1 chs C2 S1 S2] 
         par_hyper_hoare_tripleE[of P "Parallel C1 chs C2" Q "{ExParState s1 s2 |s1 s2. s1 \<in> S1 \<and> s2 \<in> S2}"]
@@ -2143,5 +2143,7 @@ next
     qed
   qed
 qed
+
+
 
 end

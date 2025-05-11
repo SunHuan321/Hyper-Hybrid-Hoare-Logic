@@ -191,8 +191,6 @@ declare WaitBlk_simps [simp del]
 
 type_synonym trace = "trace_block list"
 
-type_synonym tassn = "trace \<Rightarrow> bool"
-
 
 subsection \<open>Big-step semantics for the single process\<close>
 
@@ -284,8 +282,21 @@ inductive_cases interruptE: "big_step (Interrupt ode b cs) s1 tr s2"
 subsection \<open>Extended Semantics for the single process\<close>
 
 type_synonym ('lvar, 'lval) lstate = "'lvar \<Rightarrow> 'lval"
+type_synonym ('lvar, 'lval) exstate = "('lvar, 'lval) lstate \<times> state \<times> trace"
 
-definition sem :: "proc \<Rightarrow> (('lvar, 'lval) lstate \<times> state \<times> trace) set \<Rightarrow> (('lvar, 'lval) lstate \<times> state \<times> trace) set"
+definition lproj :: "('lvar, 'lval) exstate \<Rightarrow> ('lvar, 'lval) lstate" where
+  "lproj \<sigma> = fst \<sigma>"
+
+definition pproj :: "('lvar, 'lval) exstate \<Rightarrow> state" where
+  "pproj \<sigma> = fst (snd \<sigma>)"
+
+definition tproj :: "('lvar, 'lval) exstate \<Rightarrow> trace" where
+  "tproj \<sigma> = snd (snd \<sigma>)"
+
+definition ex2s :: "('lvar, 'lval) exstate \<Rightarrow> state \<times> trace" where
+  "ex2s ex = snd ex"
+
+definition sem :: "proc \<Rightarrow> (('lvar, 'lval) exstate) set \<Rightarrow> (('lvar, 'lval) exstate) set"
   where "sem C \<Sigma> = {(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l @ l') | \<sigma>\<^sub>l \<sigma>\<^sub>p \<sigma>\<^sub>p' l l'. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> \<Sigma> \<and> big_step C \<sigma>\<^sub>p l' \<sigma>\<^sub>p'}"
 
 lemma in_sem: 
@@ -1280,28 +1291,10 @@ lemma subsetPairI:
   shows "A \<subseteq> B"
   by (simp add: assms subrelI)
 
-(*
-lemma par_sem_single: 
-  "par_sem (Single C) S = {(ExState (\<sigma>\<^sub>l, \<sigma>\<^sub>p'), l) |\<sigma>\<^sub>l \<sigma>\<^sub>p \<sigma>\<^sub>p' l. ExState (\<sigma>\<^sub>l, \<sigma>\<^sub>p) \<in> S \<and> big_step C \<sigma>\<^sub>p l \<sigma>\<^sub>p'}" (is "?A = ?B")
-proof
-  show "?A \<subseteq> ?B"
-  proof(rule subsetPairI)
-    fix s' l assume "(s', l) \<in> ?A"
-    then obtain s where a0: "s \<in> S" "par_big_step (Single C) (ex2gstate s) l (ex2gstate s')" "ex_logical_same s s'"
-      by (metis fst_conv in_par_sem snd_conv)
-    then obtain \<sigma>\<^sub>p \<sigma>\<^sub>l \<sigma>\<^sub>p' where "ExState (\<sigma>\<^sub>l, \<sigma>\<^sub>p) \<in> S" "big_step C \<sigma>\<^sub>p l \<sigma>\<^sub>p'" "s' = ExState (\<sigma>\<^sub>l, \<sigma>\<^sub>p')"
-      by (metis (no_types, lifting) SingleE ex2gstate.simps(1) ex_sem_single_logical gstate.inject(1) snd_conv)
-    then show "(s', l) \<in> ?B"
-      by blast
-  qed
-  show "?B \<subseteq> ?A"
-  proof(rule subsetPairI)
-    fix s' l assume "(s', l) \<in> ?B"
-    then show "(s', l) \<in> ?A"
-      using SingleB in_par_sem by fastforce
-  qed
-qed
-*)
+lemma par_sem_monotonic:
+  assumes "S \<subseteq> S'"
+  shows "par_sem C S \<subseteq> par_sem C S'"
+  by (meson assms in_mono in_par_sem subsetI)
 
 lemma par_sem_single: 
   assumes "S = {ExState (\<sigma>\<^sub>l, \<sigma>\<^sub>p) |\<sigma>\<^sub>l \<sigma>\<^sub>p. (\<sigma>\<^sub>l, \<sigma>\<^sub>p) \<in> S'}"
@@ -1329,10 +1322,11 @@ proof
     then obtain \<sigma>\<^sub>p where "(\<sigma>\<^sub>l, \<sigma>\<^sub>p) \<in> S'" "big_step C \<sigma>\<^sub>p l \<sigma>\<^sub>p'"
       by (smt (verit) Pair_inject append_self_conv2 assms(2) mem_Collect_eq sem_def)
     then show "(s', l) \<in> ?A"
-      using SingleB in_par_sem assms sledgehammer
+      using SingleB in_par_sem assms 
+      by (smt (verit) \<open>s' = ExState (\<sigma>\<^sub>l, \<sigma>\<^sub>p')\<close> ex2gstate.simps(1) ex_logical_same.simps(1) fst_conv mem_Collect_eq sndI)
   qed
 qed
-*)
+
 lemma par_sem_parallel:
   "par_sem (Parallel C1 chs C2) {ExParState s1 s2 |s1 s2. s1 \<in> S1 \<and> s2 \<in> S2} = 
   {(ExParState s1 s2, l) |s1 s2 l1 l2 l. 
