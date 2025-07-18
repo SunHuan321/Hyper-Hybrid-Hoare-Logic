@@ -25,6 +25,7 @@ datatype proc =
 | Havoc var                 ("_ ::= *" [99] 94)
 | Seq proc proc           ("_; _" [91,90] 90)
 | Assume fform         
+| Wait exp  \<comment> \<open>Waiting for a specified amount of time\<close>
 | IChoice proc proc  \<comment> \<open>Nondeterminism\<close>
 | Rep proc   \<comment> \<open>Nondeterministic repetition\<close>
 | Cont ODE fform  \<comment> \<open>ODE with boundary\<close>
@@ -46,31 +47,19 @@ datatype comm_type = In | Out | IO
 
 datatype trace_block =
   CommBlock comm_type cname real
-| WaitBlock ereal "real \<Rightarrow> gstate" rdy_info
+| WaitBlock real "real \<Rightarrow> gstate" rdy_info
 
 abbreviation "InBlock ch v \<equiv> CommBlock In ch v"
 abbreviation "OutBlock ch v \<equiv> CommBlock Out ch v"
 abbreviation "IOBlock ch v \<equiv> CommBlock IO ch v"
 
-fun WaitBlk :: "ereal \<Rightarrow> (real \<Rightarrow> gstate) \<Rightarrow> rdy_info \<Rightarrow> trace_block" where
-  "WaitBlk (ereal d) p rdy = WaitBlock (ereal d) (\<lambda>\<tau>\<in>{0..d}. p \<tau>) rdy"
-| "WaitBlk PInfty p rdy = WaitBlock PInfty (\<lambda>\<tau>\<in>{0..}. p \<tau>) rdy"
-| "WaitBlk MInfty p rdy = WaitBlock MInfty (\<lambda>_. undefined) rdy"
-
-lemma WaitBlk_simps [simp]:
-  "WaitBlk (ereal d) p rdy = WaitBlock (ereal d) (\<lambda>\<tau>\<in>{0..d}. p \<tau>) rdy"
-  "WaitBlk \<infinity> p rdy = WaitBlock \<infinity> (\<lambda>\<tau>\<in>{0..}. p \<tau>) rdy"
-  "WaitBlk (-\<infinity>) p rdy = WaitBlock (-\<infinity>) (\<lambda>_. undefined) rdy"
-  apply auto
-  using WaitBlk.simps(2) infinity_ereal_def apply presburger
-  using WaitBlk.simps(3) by auto
-
-declare WaitBlk.simps [simp del]
+definition WaitBlk :: "real \<Rightarrow> (real \<Rightarrow> gstate) \<Rightarrow> rdy_info \<Rightarrow> trace_block" where
+  "WaitBlk d p rdy = WaitBlock d (\<lambda>\<tau>\<in>{0..d}. p \<tau>) rdy"
 
 lemma WaitBlk_not_Comm [simp]:
   "WaitBlk d p rdy \<noteq> CommBlock ch_type ch v"
   "CommBlock ch_type ch v \<noteq> WaitBlk d p rdy"
-  by (cases d, auto)+
+  by (simp add: WaitBlk_def)+
 
 lemma restrict_cong_to_eq:
   fixes x :: real
@@ -82,112 +71,49 @@ lemma restrict_cong_to_eq2:
   shows "restrict p1 {0..} = restrict p2 {0..} \<Longrightarrow> 0 \<le> x \<Longrightarrow> p1 x = p2 x"
   apply (auto simp add: restrict_def) by metis
 
-lemma WaitBlk_ext:
-  fixes t1 t2 :: ereal
-    and hist1 hist2 :: "real \<Rightarrow> gstate"
-  shows "t1 = t2 \<Longrightarrow>
+lemma WaitBlk_ext: "t1 = t2 \<Longrightarrow>
    (\<And>\<tau>::real. 0 \<le> \<tau> \<Longrightarrow> \<tau> \<le> t1 \<Longrightarrow> hist1 \<tau> = hist2 \<tau>) \<Longrightarrow> rdy1 = rdy2 \<Longrightarrow>
    WaitBlk t1 hist1 rdy1 = WaitBlk t2 hist2 rdy2"
-  apply (cases t1)
-  apply (auto simp add: restrict_def)
-  apply (rule ext) by auto
+  by (auto simp add: restrict_def WaitBlk_def)
 
-lemma WaitBlk_ext_real:
-  fixes t1 :: real
-    and t2 :: real
-  shows "t1 = t2 \<Longrightarrow> (\<And>\<tau>. 0 \<le> \<tau> \<Longrightarrow> \<tau> \<le> t1 \<Longrightarrow> hist1 \<tau> = hist2 \<tau>) \<Longrightarrow> rdy1 = rdy2 \<Longrightarrow>
-         WaitBlk (ereal t1) hist1 rdy1 = WaitBlk (ereal t2) hist2 rdy2"
-  by (auto simp add: restrict_def)
+lemma WaitBlk_ext_real:  "t1 = t2 \<Longrightarrow> (\<And>\<tau>. 0 \<le> \<tau> \<Longrightarrow> \<tau> \<le> t1 \<Longrightarrow> hist1 \<tau> = hist2 \<tau>) \<Longrightarrow> rdy1 = rdy2 \<Longrightarrow>
+         WaitBlk t1 hist1 rdy1 = WaitBlk t2 hist2 rdy2"
+  by (auto simp add: restrict_def WaitBlk_def)
 
 lemma WaitBlk_cong:
   "WaitBlk t1 hist1 rdy1 = WaitBlk t2 hist2 rdy2 \<Longrightarrow> t1 = t2 \<and> rdy1 = rdy2"
-  apply (cases t1) by (cases t2, auto)+
+  by (simp add: WaitBlk_def)
 
 lemma WaitBlk_cong2:
   assumes "WaitBlk t1 hist1 rdy1 = WaitBlk t2 hist2 rdy2"
     and "0 \<le> t" "t \<le> t1"
   shows "hist1 t = hist2 t"
-proof -
-  have a: "t1 = t2" "rdy1 = rdy2"
-    using assms WaitBlk_cong by auto
-  show ?thesis
-  proof (cases t1)
-    case (real r)
-    have real2: "t2 = ereal r"
-      using real a by auto
-    show ?thesis
-      using assms(1)[unfolded real real2]
-      apply auto using restrict_cong_to_eq assms ereal_less_eq(3) real by blast
-  next
-    case PInf
-    have PInf2: "t2 = \<infinity>"
-      using PInf a by auto
-    show ?thesis
-      using assms(1)[unfolded PInf PInf2] restrict_cong_to_eq2 assms by auto
-  next
-    case MInf
-    show ?thesis
-      using assms MInf by auto
-  qed
-qed
+  using assms by (metis WaitBlk_def  restrict_cong_to_eq trace_block.inject(2))
 
 lemma WaitBlk_split1:
-  fixes t1 :: real
   assumes "WaitBlk t p1 rdy = WaitBlk t p2 rdy"
-    and "0 < t1" "ereal t1 < t"
-  shows "WaitBlk (ereal t1) p1 rdy = WaitBlk (ereal t1) p2 rdy"
-proof (cases t)
-  case (real r)
-  show ?thesis
-    apply auto apply (rule ext) subgoal for x
-      using assms[unfolded real] 
-      using restrict_cong_to_eq[of p1 r p2 x] by auto
-    done
-next
-  case PInf
-  show ?thesis
-    apply auto apply (rule ext) subgoal for x
-      using assms[unfolded PInf] restrict_cong_to_eq2[of p1 p2 x] by auto
-    done
-next
-  case MInf
-  then show ?thesis
-    using assms by auto
-qed
+    and "0 < t1" "t1 < t"
+  shows "WaitBlk t1 p1 rdy = WaitBlk t1 p2 rdy"
+  by (smt (verit, best) WaitBlk_cong2 WaitBlk_ext_real assms(1) assms(3))
 
 lemma WaitBlk_split2:
-  fixes t1 :: real
   assumes "WaitBlk t p1 rdy = WaitBlk t p2 rdy"
-    and "0 < t1" "ereal t1 < t"
-  shows "WaitBlk (t - ereal t1) (\<lambda>\<tau>::real. p1 (\<tau> + t1)) rdy =
-         WaitBlk (t - ereal t1) (\<lambda>\<tau>::real. p2 (\<tau> + t1)) rdy"
-proof (cases t)
-  case (real r)
-  have a: "t - ereal t1 = ereal (r - t1)"
-    unfolding real by auto
-  show ?thesis
-    unfolding a apply auto apply (rule ext) subgoal for x
-      using assms[unfolded real]
-      using restrict_cong_to_eq[of p1 r p2 "x + t1"] by auto
-    done
-next
-  case PInf
-  have a: "t - ereal t1 = \<infinity>"
-    unfolding PInf by auto
-  show ?thesis
-    unfolding a
-    apply auto
-    apply (rule ext) subgoal for x
-      using assms[unfolded PInf] restrict_cong_to_eq2[of p1 p2 "x + t1"] by auto
-    done
-next
-  case MInf
-  then show ?thesis
-    using assms by auto
-qed
+    and "0 < t1" "t1 < t"
+  shows "WaitBlk (t - t1) (\<lambda>\<tau>::real. p1 (\<tau> + t1)) rdy =
+         WaitBlk (t - t1) (\<lambda>\<tau>::real. p2 (\<tau> + t1)) rdy"
+  by (smt (verit, best) WaitBlk_cong2 WaitBlk_ext_real assms(1) assms(2))
 
 lemmas WaitBlk_split = WaitBlk_split1 WaitBlk_split2
-declare WaitBlk_simps [simp del]
+
+lemma WaitBlk_eqE:
+  "WaitBlk d p rdy = WaitBlk d2 p2 rdy2 \<Longrightarrow>
+   (d = d2 \<Longrightarrow> rdy = rdy2 \<Longrightarrow> (\<And>t. t \<in> {0..d} \<Longrightarrow> p t = p2 t) \<Longrightarrow> P) \<Longrightarrow> P"
+  unfolding WaitBlk_def restrict_def apply auto by meson
+
+lemma WaitBlk_eqI:
+  "d = d2 \<Longrightarrow> rdy = rdy2 \<Longrightarrow> (\<And>t. t \<in> {0..d} \<Longrightarrow> p t = p2 t) \<Longrightarrow>
+   WaitBlk d p rdy = WaitBlk d2 p2 rdy2"
+  unfolding WaitBlk_def by auto
 
 type_synonym trace = "trace_block list"
 
@@ -214,16 +140,16 @@ inductive big_step :: "proc \<Rightarrow> state \<Rightarrow> trace \<Rightarrow
          big_step p2 s2 tr2 s3 \<Longrightarrow>
          big_step (p1; p2) s1 (tr1 @ tr2) s3"
 | AssumeB: "b s1 \<Longrightarrow> big_step (Assume b) s1 [] s1"
+| waitB1: "e s > 0 \<Longrightarrow> big_step (Wait e) s [WaitBlk (e s) (\<lambda>_. State s) ({}, {})] s"
+| waitB2: "\<not> e s > 0 \<Longrightarrow> big_step (Wait e) s [] s"
 | sendB1: "big_step (Cm (ch[!]e)) s [OutBlock ch (e s)] s"
 | sendB2: "(d::real) > 0 \<Longrightarrow> big_step (Cm (ch[!]e)) s
             [WaitBlk d (\<lambda>_. State s) ({ch}, {}),
              OutBlock ch (e s)] s"
-| sendB3: "big_step (Cm (ch[!]e)) s [WaitBlk \<infinity> (\<lambda>_. State s) ({ch}, {})] s"
 | receiveB1: "big_step (Cm (ch[?]var)) s [InBlock ch v] (s(var := v))"
 | receiveB2: "(d::real) > 0 \<Longrightarrow> big_step (Cm (ch[?]var)) s
             [WaitBlk d (\<lambda>_. State s) ({}, {ch}),
              InBlock ch v] (s(var := v))"
-| receiveB3: "big_step (Cm (ch[?]var)) s [WaitBlk \<infinity> (\<lambda>_. State s) ({}, {ch})] s"
 | IChoiceB1: "big_step p1 s1 tr s2 \<Longrightarrow> big_step (IChoice p1 p2) s1 tr s2"
 | IChoiceB2: "big_step p2 s1 tr s2 \<Longrightarrow> big_step (IChoice p1 p2) s1 tr s2"
 | RepetitionB1: "big_step (Rep p) s [] s"
@@ -491,7 +417,8 @@ lemma in_closure_then_while:
 proof(induct arbitrary: l rule: big_step.induct)
   case (RepetitionB2 C' \<sigma> tr1 \<sigma>' tr2 \<sigma>'' tr3)
   then show ?case
-    by (metis append.assoc big_step_rel_def converse_rtranclp_into_rtranclp fst_conv proc.inject(7) snd_conv)
+    using append.assoc big_step_rel_def converse_rtranclp_into_rtranclp fst_conv
+    by (metis proc.inject(8) snd_conv)    
 next
   case (RepetitionB1 C' \<sigma>)
   then show ?case
@@ -643,10 +570,36 @@ proof
   qed
 qed
 
+thm waitE
+
+lemma sem_wait:
+  "sem (Wait d) S = {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S \<and> \<not> 0 < d \<sigma>\<^sub>p} \<union>
+  {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk (d \<sigma>\<^sub>p) (\<lambda>_. State \<sigma>\<^sub>p) ({}, {})]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. 0 < d \<sigma>\<^sub>p \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}" (is "?A = ?B")
+proof
+  show "?A \<subseteq> ?B"
+  proof (rule subsetTupleI)
+    fix \<sigma>\<^sub>l \<sigma>\<^sub>p' l
+    assume "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l) \<in> ?A"
+    then obtain tr0 tr1 where "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr0) \<in> S" "big_step (Wait d) \<sigma>\<^sub>p' tr1 \<sigma>\<^sub>p'" "l = tr0 @ tr1"
+      by (metis (no_types, lifting) fst_eqD in_sem snd_eqD waitE)
+    then show "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l) \<in> ?B"
+      by (rule_tac waitE[of d \<sigma>\<^sub>p' tr1 \<sigma>\<^sub>p'], simp_all)
+  qed
+  show "?B \<subseteq> ?A" (is "?C \<union> ?D  \<subseteq> ?A")
+  proof (rule Un_least)+
+    show "?C \<subseteq> ?A"
+      using sem_def waitB2
+      by (smt (verit, ccfv_SIG) append.right_neutral mem_Collect_eq subsetI)
+    show "?D \<subseteq> ?A"
+      using sem_def waitB1
+      by (smt (verit, best) mem_Collect_eq subsetI)
+  qed
+qed
+
 lemma sem_send:
   "sem (Cm (ch[!]e)) S = {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [OutBlock ch (e \<sigma>\<^sub>p)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
-  {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk d (\<lambda>_. State \<sigma>\<^sub>p) ({ch}, {}), OutBlock ch (e \<sigma>\<^sub>p)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d. (d::real) > 0 \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
-  {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk \<infinity> (\<lambda>_. State \<sigma>\<^sub>p) ({ch}, {})]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}" (is "?A = ?B")
+  {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk d (\<lambda>_. State \<sigma>\<^sub>p) ({ch}, {}), OutBlock ch (e \<sigma>\<^sub>p)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d. (d::real) > 0 \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}" 
+  (is "?A = ?B")
 proof
   show "?A \<subseteq> ?B"
   proof (rule subsetTupleI)
@@ -657,21 +610,18 @@ proof
     then show "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l) \<in> ?B"
       apply (rule_tac sendE[of ch e \<sigma>\<^sub>p' tr1 \<sigma>\<^sub>p'], simp_all) by auto
   qed
-  show "?B \<subseteq> ?A" (is "?C \<union> ?D \<union> ?F \<subseteq> ?A")
+  show "?B \<subseteq> ?A" (is "?C \<union> ?D  \<subseteq> ?A")
   proof (rule Un_least)+
     show "?C \<subseteq> ?A"
       using sem_def sendB1 by fastforce
-    show "?D \<subseteq> ?A"
+    show "?D \<subseteq> ?A"     
       using sem_def sendB2 by fastforce
-    show "?F \<subseteq> ?A"
-      using sem_def sendB3 by fastforce
   qed
 qed
 
 lemma sem_recv:
   "sem (Cm (ch[?]var)) S = {(\<sigma>\<^sub>l, \<sigma>\<^sub>p(var := v), l @ [InBlock ch v]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
-  {(\<sigma>\<^sub>l, \<sigma>\<^sub>p(var := v), l @ [WaitBlk d (\<lambda>_. State \<sigma>\<^sub>p) ({}, {ch}), InBlock ch v]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d v. (d::real) > 0 \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
-  {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk \<infinity> (\<lambda>_. State \<sigma>\<^sub>p) ({}, {ch})]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}" (is "?A = ?B")
+  {(\<sigma>\<^sub>l, \<sigma>\<^sub>p(var := v), l @ [WaitBlk d (\<lambda>_. State \<sigma>\<^sub>p) ({}, {ch}), InBlock ch v]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d v. (d::real) > 0 \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}" (is "?A = ?B")
 proof
   show "?A \<subseteq> ?B"
   proof (rule subsetTupleI)
@@ -682,14 +632,12 @@ proof
     then show "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l) \<in> ?B"
       apply (rule_tac receiveE[of ch var \<sigma>\<^sub>p tr1 \<sigma>\<^sub>p'], simp_all) by auto
   qed
-  show "?B \<subseteq> ?A" (is "?C \<union> ?D \<union> ?F \<subseteq> ?A")
+  show "?B \<subseteq> ?A" (is "?C \<union> ?D  \<subseteq> ?A")
   proof (rule Un_least)+
     show "?C \<subseteq> ?A"
       using sem_def receiveB1 by fastforce
     show "?D \<subseteq> ?A"
       using sem_def receiveB2 by fastforce
-    show "?F \<subseteq> ?A"
-      using sem_def receiveB3 by fastforce
   qed
 qed
 
@@ -756,7 +704,7 @@ next
 qed
 
 lemma sem_interrupt_send2:
-  "sem C {(\<sigma>\<^sub>l, sl d, l @ [WaitBlk (ereal d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), OutBlock ch (e (sl d))]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d sl.
+  "sem C {(\<sigma>\<^sub>l, sl d, l @ [WaitBlk ( d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), OutBlock ch (e (sl d))]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d sl.
   (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> \<Sigma> \<and> 0 < d \<and> ODEsol ode sl d \<and> sl 0 = \<sigma>\<^sub>p \<and> (\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (sl t))} = 
   {(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr0 @ [WaitBlk d (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), OutBlock ch (e (sl d))] @ tr1) 
   |\<sigma>\<^sub>l \<sigma>\<^sub>p tr0 d sl tr1 \<sigma>\<^sub>p'. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> \<Sigma> \<and> d > 0 \<and> ODEsol ode sl d \<and> sl 0 = \<sigma>\<^sub>p \<and>
@@ -768,7 +716,7 @@ proof
     assume "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l') \<in> ?A"
     then obtain \<sigma>\<^sub>p tr0 l d sl where "(\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> \<Sigma>" "0 < d" "ODEsol ode sl d" "sl 0 = \<sigma>\<^sub>p"
     "\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (sl t)" "big_step C (sl d) l \<sigma>\<^sub>p'" 
-    "l' = tr0 @ [WaitBlk (ereal d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), OutBlock ch (e (sl d))] @ l"
+    "l' = tr0 @ [WaitBlk ( d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), OutBlock ch (e (sl d))] @ l"
       by (smt (verit) append.assoc fst_conv in_sem mem_Collect_eq snd_conv)
     then show "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l') \<in> ?B"
       by auto
@@ -780,10 +728,10 @@ next
     assume "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l') \<in> ?B"
     then obtain \<sigma>\<^sub>p tr0 d sl l where a: "(\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> \<Sigma>" "0 < d" "ODEsol ode sl d" "sl 0 = \<sigma>\<^sub>p" 
     "\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (sl t)" "big_step C (sl d) l \<sigma>\<^sub>p'" 
-    "l' = (tr0 @ [WaitBlk (ereal d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), OutBlock ch (e (sl d))]) @ l"
+    "l' = (tr0 @ [WaitBlk ( d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), OutBlock ch (e (sl d))]) @ l"
       by auto
-    then have "(\<sigma>\<^sub>l, sl d, tr0 @ [WaitBlk (ereal d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), OutBlock ch (e (sl d))])
-    \<in> {(\<sigma>\<^sub>l, sl d, l @ [WaitBlk (ereal d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), OutBlock ch (e (sl d))]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d sl.
+    then have "(\<sigma>\<^sub>l, sl d, tr0 @ [WaitBlk ( d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), OutBlock ch (e (sl d))])
+    \<in> {(\<sigma>\<^sub>l, sl d, l @ [WaitBlk ( d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), OutBlock ch (e (sl d))]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d sl.
        (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> \<Sigma> \<and> 0 < d \<and> ODEsol ode sl d \<and> sl 0 = \<sigma>\<^sub>p \<and> (\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (sl t))}"
       by auto
     with a show "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l') \<in> ?A"
@@ -793,10 +741,10 @@ qed
 
 lemma sem_interrupt_send:
   "sem C ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [OutBlock ch (e \<sigma>\<^sub>p)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> V} \<union>
-  {(\<sigma>\<^sub>l, sl d, l @ [WaitBlk (ereal d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), OutBlock ch (e (sl d))]) |\<sigma>\<^sub>l l d sl.
+  {(\<sigma>\<^sub>l, sl d, l @ [WaitBlk ( d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), OutBlock ch (e (sl d))]) |\<sigma>\<^sub>l l d sl.
   (\<sigma>\<^sub>l, sl 0, l) \<in> V \<and> 0 < d \<and> ODEsol ode sl d \<and> (\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (sl t))}) =
    {(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr0 @ OutBlock ch (e \<sigma>\<^sub>p) # tr1) |\<sigma>\<^sub>l \<sigma>\<^sub>p tr0 tr1 \<sigma>\<^sub>p'. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> V \<and> big_step C \<sigma>\<^sub>p tr1 \<sigma>\<^sub>p'} \<union>
-   {(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr0 @ WaitBlk (ereal d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs) # OutBlock ch (e (sl d)) # tr1) |\<sigma>\<^sub>l tr0 d sl tr1 \<sigma>\<^sub>p'.
+   {(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr0 @ WaitBlk ( d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs) # OutBlock ch (e (sl d)) # tr1) |\<sigma>\<^sub>l tr0 d sl tr1 \<sigma>\<^sub>p'.
    (\<sigma>\<^sub>l, sl 0, tr0) \<in> V \<and> 0 < d \<and> ODEsol ode sl d \<and> (\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (sl t)) \<and> big_step C (sl d) tr1 \<sigma>\<^sub>p'}"
   (is "sem C (?A \<union> ?B) = ?C \<union> ?D")
 proof-
@@ -838,7 +786,7 @@ next
 qed
 
 lemma sem_interrupt_recv2:
-  "sem C {(\<sigma>\<^sub>l, (sl d)(var := v), l @ [WaitBlk (ereal d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), InBlock ch v]) 
+  "sem C {(\<sigma>\<^sub>l, (sl d)(var := v), l @ [WaitBlk ( d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), InBlock ch v]) 
   |\<sigma>\<^sub>l \<sigma>\<^sub>p l d sl v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> \<Sigma> \<and> 0 < d \<and> ODEsol ode sl d \<and> sl 0 = \<sigma>\<^sub>p \<and> (\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (sl t))} = 
   {(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr0 @ [WaitBlk d (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), InBlock ch v] @ tr1) 
   |\<sigma>\<^sub>l \<sigma>\<^sub>p tr0 tr1 \<sigma>\<^sub>p' d sl v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> \<Sigma> \<and> d > 0 \<and> ODEsol ode sl d \<and> sl 0 = \<sigma>\<^sub>p \<and>
@@ -850,7 +798,7 @@ proof
     assume "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l') \<in> ?A"
     then obtain \<sigma>\<^sub>p tr0 l d sl v where "(\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> \<Sigma>" "0 < d" "ODEsol ode sl d" "sl 0 = \<sigma>\<^sub>p"
     "\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (sl t)" "big_step C ((sl d)(var := v)) l \<sigma>\<^sub>p'" 
-    "l' = tr0 @ [WaitBlk (ereal d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), InBlock ch v] @ l"
+    "l' = tr0 @ [WaitBlk ( d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), InBlock ch v] @ l"
       by (smt (verit) append.assoc fst_conv in_sem mem_Collect_eq snd_conv)
     then show "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l') \<in> ?B"
       by blast
@@ -862,10 +810,10 @@ next
     assume "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l') \<in> ?B"
    then obtain \<sigma>\<^sub>p tr0 l d sl v where a: "(\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> \<Sigma>" "0 < d" "ODEsol ode sl d" "sl 0 = \<sigma>\<^sub>p"
     "\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (sl t)" "big_step C ((sl d)(var := v)) l \<sigma>\<^sub>p'" 
-    "l' = (tr0 @ [WaitBlk (ereal d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), InBlock ch v]) @ l"
+    "l' = (tr0 @ [WaitBlk ( d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), InBlock ch v]) @ l"
       by auto
-    then have "(\<sigma>\<^sub>l, (sl d)(var := v), tr0 @ [WaitBlk (ereal d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs),InBlock ch v])
-    \<in> {(\<sigma>\<^sub>l, (sl d)(var := v), l @ [WaitBlk (ereal d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), InBlock ch v]) 
+    then have "(\<sigma>\<^sub>l, (sl d)(var := v), tr0 @ [WaitBlk ( d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs),InBlock ch v])
+    \<in> {(\<sigma>\<^sub>l, (sl d)(var := v), l @ [WaitBlk ( d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), InBlock ch v]) 
       |\<sigma>\<^sub>l \<sigma>\<^sub>p l d sl v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> \<Sigma> \<and> 0 < d \<and> ODEsol ode sl d \<and> sl 0 = \<sigma>\<^sub>p \<and> (\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (sl t))}"
       by auto
     with a show "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l') \<in> ?A"
@@ -875,7 +823,7 @@ qed
 
 lemma sem_interrupt_recv:
   "sem C ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p(var := v), l @ [InBlock ch v]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> V} \<union>
-  {(\<sigma>\<^sub>l, (sl d)(var := v), l @ [WaitBlk (ereal d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), InBlock ch v]) 
+  {(\<sigma>\<^sub>l, (sl d)(var := v), l @ [WaitBlk ( d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), InBlock ch v]) 
   |\<sigma>\<^sub>l \<sigma>\<^sub>p l d sl v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> V \<and> 0 < d \<and> ODEsol ode sl d \<and> sl 0 = \<sigma>\<^sub>p \<and> (\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (sl t))}) =
   {(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr0 @ InBlock ch v # tr1) |\<sigma>\<^sub>l \<sigma>\<^sub>p tr0 tr1 \<sigma>\<^sub>p' v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> V \<and> big_step C (\<sigma>\<^sub>p(var := v)) tr1 \<sigma>\<^sub>p'} \<union>
   {(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr0 @ [WaitBlk d (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), InBlock ch v] @ tr1) 
@@ -927,7 +875,7 @@ proof
     next
       fix d p i ch e p2 tr2
       assume "(\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> S" "big_step (Interrupt ode b cs) \<sigma>\<^sub>p tr1 \<sigma>\<^sub>p'" "l = tr0 @ tr1"
-      "tr1 = WaitBlk (ereal d) (\<lambda>\<tau>. State (p \<tau>)) (rdy_of_echoice cs) # OutBlock ch (e (p d)) # tr2" 
+      "tr1 = WaitBlk ( d) (\<lambda>\<tau>. State (p \<tau>)) (rdy_of_echoice cs) # OutBlock ch (e (p d)) # tr2" 
       "0 < d" "ODEsol ode p d" "p 0 = \<sigma>\<^sub>p" "\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (p t)" "i < length cs"
       "cs ! i = (ch[!]e, p2)" "big_step p2 (p d) tr2 \<sigma>\<^sub>p'"
       then have "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l) \<in> ?D" by blast
@@ -942,7 +890,7 @@ proof
       fix d p i ch var p2 v tr2
       assume "(\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> S" 
       "big_step (Interrupt ode b cs) \<sigma>\<^sub>p tr1 \<sigma>\<^sub>p'" "l = tr0 @ tr1"
-      "tr1 = WaitBlk (ereal d) (\<lambda>\<tau>. State (p \<tau>)) (rdy_of_echoice cs) # InBlock ch v # tr2"
+      "tr1 = WaitBlk ( d) (\<lambda>\<tau>. State (p \<tau>)) (rdy_of_echoice cs) # InBlock ch v # tr2"
       "0 < d" "ODEsol ode p d" "p 0 = \<sigma>\<^sub>p" "\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (p t)" 
       "i < length cs" "cs ! i = (ch[?]var, p2)" "big_step p2 ((p d)(var := v)) tr2 \<sigma>\<^sub>p'"
       then have "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l) \<in> ?F" by blast
@@ -955,7 +903,7 @@ proof
     next
       fix d p
       assume "(\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> S" "big_step (Interrupt ode b cs) \<sigma>\<^sub>p tr1 \<sigma>\<^sub>p'" "l = tr0 @ tr1"
-      "tr1 = [WaitBlk (ereal d) (\<lambda>\<tau>. State (p \<tau>)) (rdy_of_echoice cs)]"
+      "tr1 = [WaitBlk ( d) (\<lambda>\<tau>. State (p \<tau>)) (rdy_of_echoice cs)]"
       "0 < d" "ODEsol ode p d" "\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (p t)"
       "\<not> b \<sigma>\<^sub>p'" "p 0 = \<sigma>\<^sub>p" "p d = \<sigma>\<^sub>p'"
       then have "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l) \<in> ?H" by blast
@@ -970,7 +918,7 @@ proof
     proof(rule subsetTupleI)
       fix \<sigma>\<^sub>l \<sigma>\<^sub>p' l assume "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l) \<in> ?D"
       then obtain \<sigma>\<^sub>p tr0 d sl i ch e p rdy tr1 where
-      "l = tr0 @ WaitBlk (ereal d) (\<lambda>\<tau>. State (sl \<tau>)) rdy # OutBlock ch (e (sl d)) # tr1"
+      "l = tr0 @ WaitBlk ( d) (\<lambda>\<tau>. State (sl \<tau>)) rdy # OutBlock ch (e (sl d)) # tr1"
       "(\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> S" "0 < d" "ODEsol ode sl d" "sl 0 = \<sigma>\<^sub>p" "\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (sl t)"
       "i < length cs" "cs ! i = (ch[!]e, p)" "rdy = rdy_of_echoice cs"
       "big_step p (sl d) tr1 \<sigma>\<^sub>p'"
@@ -985,7 +933,7 @@ proof
     proof(rule subsetTupleI)
       fix \<sigma>\<^sub>l \<sigma>\<^sub>p' l assume "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l) \<in> ?F"
       then obtain \<sigma>\<^sub>p tr0 d sl i ch var v p rdy tr1 where
-      "l = tr0 @ WaitBlk (ereal d) (\<lambda>\<tau>. State (sl \<tau>)) rdy # InBlock ch v # tr1"
+      "l = tr0 @ WaitBlk ( d) (\<lambda>\<tau>. State (sl \<tau>)) rdy # InBlock ch v # tr1"
       "(\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> S" "0 < d" "ODEsol ode sl d" "sl 0 = \<sigma>\<^sub>p" "\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (sl t)"
       "i < length cs" "cs ! i = (ch[?]var, p)" "rdy = rdy_of_echoice cs"
       "big_step p ((sl d)(var := v)) tr1 \<sigma>\<^sub>p'"
@@ -1003,7 +951,7 @@ proof
     show "?H \<subseteq> ?A"
     proof (rule subsetTupleI)
       fix \<sigma>\<^sub>l \<sigma>\<^sub>p' l assume "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l) \<in> ?H"
-      then obtain \<sigma>\<^sub>p tr0 d sl rdy where "l = tr0 @ [WaitBlk (ereal d) (\<lambda>\<tau>. State (sl \<tau>)) rdy]"
+      then obtain \<sigma>\<^sub>p tr0 d sl rdy where "l = tr0 @ [WaitBlk ( d) (\<lambda>\<tau>. State (sl \<tau>)) rdy]"
       "(\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> S" "0 < d" "ODEsol ode sl d" "\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (sl t)"
       "\<not> b (sl d)" "sl 0 = \<sigma>\<^sub>p" "sl d = \<sigma>\<^sub>p'" "rdy = rdy_of_echoice cs"
         by blast
@@ -1039,7 +987,7 @@ text \<open>Merge two rdy infos\<close>
 fun merge_rdy :: "rdy_info \<Rightarrow> rdy_info \<Rightarrow> rdy_info" where
   "merge_rdy (r11, r12) (r21, r22) = (r11 \<union> r21, r12 \<union> r22)"
 
-
+(*
 lemma WaitBlk_eq_combine:
   assumes "WaitBlk d1 p1 rdy1 = WaitBlk d1' p1' rdy1'"
     and "WaitBlk d1 p2 rdy2 = WaitBlk d1' p2' rdy2'"
@@ -1055,7 +1003,7 @@ proof -
   show ?thesis
   proof (cases d1)
     case (real r)
-    have b: "d1' = ereal r"
+    have b: "d1' =  r"
       using real a1(1) by auto
     show ?thesis
       unfolding real b apply (auto simp add: WaitBlk_simps)
@@ -1068,7 +1016,7 @@ proof -
     have b: "d1' = \<infinity>"
       using PInf a1 by auto
     show ?thesis
-      unfolding PInf b infinity_ereal_def
+      unfolding PInf b infinity__def
       apply (auto simp: WaitBlk_simps)
        apply (rule ext) apply auto
       subgoal for x apply (rule a2) by (auto simp add: PInf)
@@ -1083,7 +1031,7 @@ proof -
       by (auto simp: a1 WaitBlk_simps)
   qed
 qed
-
+*)
 
 text \<open>combine_blocks comms tr1 tr2 tr means tr1 and tr2 combines to tr, where
 comms is the list of internal communication channels.\<close>

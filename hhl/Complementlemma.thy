@@ -122,46 +122,27 @@ lemma SOME_const_vderiv [derivative_intros, simp]:
 subsection \<open>More theorems about logical operators\<close>
 
 theorem Valid_post_and:
-  assumes "\<Turnstile> {P} c {Q1}"
-    and "\<Turnstile> {P} c {Q2}"
-  shows "\<Turnstile> {P} c {\<lambda>s tr. Q1 s tr \<and> Q2 s tr}"
+  assumes "\<Turnstile>\<^sub>H\<^sub>L {P} c {Q1}"
+    and "\<Turnstile>\<^sub>H\<^sub>L {P} c {Q2}"
+  shows "\<Turnstile>\<^sub>H\<^sub>L {P} c {\<lambda>s tr. Q1 s tr \<and> Q2 s tr}"
   using assms unfolding Valid_def entails_def by blast
 
 theorem Valid_pre_cases:
-  assumes "\<Turnstile> {\<lambda>s tr. P s \<and> Q s} c {R}"
-    and "\<Turnstile> {\<lambda>s tr. P s \<and> \<not> Q s} c {R}"
-  shows "\<Turnstile> {\<lambda>s tr. P s} c {R}"
+  assumes "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. P s \<and> Q s} c {R}"
+    and "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. P s \<and> \<not> Q s} c {R}"
+  shows "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. P s} c {R}"
   using assms unfolding Valid_def entails_def by blast
 
 theorem Valid_ichoice_sp_st:
-  assumes "\<Turnstile> {P} c1 {Q}"
-    and "\<Turnstile> {P} c2 {Q}"
-  shows "\<Turnstile> {P} IChoice c1 c2 {Q}"
+  assumes "\<Turnstile>\<^sub>H\<^sub>L {P} c1 {Q}"
+    and "\<Turnstile>\<^sub>H\<^sub>L {P} c2 {Q}"
+  shows "\<Turnstile>\<^sub>H\<^sub>L {P} IChoice c1 c2 {Q}"
   using assms unfolding Valid_def by (auto elim: ichoiceE)
-
-theorem Valid_cond_split:
-  assumes "\<Turnstile> {\<lambda>s t. b s \<and> P s t} c1 {Q}"
-    and "\<Turnstile> {\<lambda>s t. \<not>b s \<and> P s t} c2 {Q}"
-  shows "\<Turnstile> {\<lambda>s t. P s t}
-             IF b THEN c1 ELSE c2 FI
-            {\<lambda>s t. Q s t}"
-  using assms unfolding Valid_def
-  by (auto elim!: condE seqE)
-
-theorem Valid_cond_split':
-  assumes "\<Turnstile> {\<lambda>s t. b s \<and> P s t} c1; d {Q}"
-    and "\<Turnstile> {\<lambda>s t. \<not>b s \<and> P s t} c2; d {Q}"
-  shows "\<Turnstile> {\<lambda>s t. P s t}
-             IF b THEN c1 ELSE c2 FI; d
-            {\<lambda>s t. Q s t}"
-  using assms unfolding Valid_def
-  apply (auto elim!: condE seqE)
-  by (auto simp add: seqB)
 
 theorem Valid_ode_not:
   assumes "\<And>s. P s \<Longrightarrow> \<not> b s"
     and "\<And>s. P s \<Longrightarrow> Q s"
-  shows "\<Turnstile> {\<lambda>s tr. P s}
+  shows "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. P s}
      Cont ode b
     {\<lambda>s tr. Q s}"
   unfolding Valid_def
@@ -177,7 +158,7 @@ theorem Valid_inv_s_eq:
   fixes inv :: "state \<Rightarrow> real"
   assumes "\<forall>x. ((\<lambda>v. inv (vec2state v)) has_derivative g' x) (at x within UNIV)"
       and "\<forall>S. b S \<longrightarrow> g' (state2vec S) (ODE2Vec ode S) = 0"
-  shows "\<Turnstile> {\<lambda>s tr. inv s = r}
+  shows "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. inv s = r}
      Cont ode b
     {\<lambda>s tr. inv s = r}"
   unfolding Valid_def
@@ -215,7 +196,7 @@ theorem Valid_inv_s_tr_eq:
   fixes inv :: "state \<Rightarrow> real"
   assumes "\<forall>x. ((\<lambda>v. inv (vec2state v)) has_derivative g' x) (at x within UNIV)"
       and "\<forall>S. b S \<longrightarrow> g' (state2vec S) (ODE2Vec ode S) = 0"
-  shows "\<Turnstile> {\<lambda>s tr. inv s = r \<and> P tr \<and> b s}
+  shows "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. inv s = r \<and> P tr \<and> b s}
      Cont ode b
     {\<lambda>s tr. inv s = r \<and> (P @\<^sub>t ode_inv_assn (\<lambda>s. inv s = r)) tr}"
   apply (rule Valid_post_and)
@@ -237,7 +218,7 @@ theorem Valid_inv_s_ge:
   fixes inv :: "state \<Rightarrow> real"
   assumes "\<forall>x. ((\<lambda>v. inv (vec2state v)) has_derivative g' x) (at x within UNIV)"
       and "\<forall>S. b S \<longrightarrow> g' (state2vec S) (ODE2Vec ode S) \<ge> 0"
-  shows "\<Turnstile> {\<lambda>s tr. inv s \<ge> r}
+  shows "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. inv s \<ge> r}
      Cont ode b
     {\<lambda>s tr. inv s \<ge> r}"
   unfolding Valid_def
@@ -270,7 +251,7 @@ theorem Valid_inv_tr_ge:
   fixes inv :: "state \<Rightarrow> real"
   assumes "\<forall>x. ((\<lambda>v. inv (vec2state v)) has_derivative g' x) (at x within UNIV)"
       and "\<forall>S. b S \<longrightarrow> g' (state2vec S) (ODE2Vec ode S) \<ge> 0"
-  shows "\<Turnstile> {\<lambda>s tr. inv s \<ge> r \<and> P tr \<and> b s}
+  shows "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. inv s \<ge> r \<and> P tr \<and> b s}
      Cont ode b
     {\<lambda>s tr. (P @\<^sub>t ode_inv_assn (\<lambda>s. inv s \<ge> r)) tr}"
   unfolding Valid_def
@@ -309,7 +290,7 @@ theorem Valid_inv_s_tr_ge:
   fixes inv :: "state \<Rightarrow> real"
   assumes "\<forall>x. ((\<lambda>v. inv (vec2state v)) has_derivative g' x) (at x within UNIV)"
       and "\<forall>S. b S \<longrightarrow> g' (state2vec S) (ODE2Vec ode S) \<ge> 0"
-  shows "\<Turnstile> {\<lambda>s tr. inv s \<ge> r \<and> P tr \<and> b s}
+  shows "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. inv s \<ge> r \<and> P tr \<and> b s}
      Cont ode b
     {\<lambda>s tr. inv s \<ge> r \<and> (P @\<^sub>t ode_inv_assn (\<lambda>s. inv s \<ge> r)) tr}"
   apply(rule Valid_post_and)
@@ -330,7 +311,7 @@ theorem Valid_inv_s_g:
   fixes inv :: "state \<Rightarrow> real"
   assumes "\<forall>x. ((\<lambda>v. inv (vec2state v)) has_derivative g' x) (at x within UNIV)"
       and "\<forall>S. b S \<longrightarrow> g' (state2vec S) (ODE2Vec ode S) \<ge> 0"
-  shows "\<Turnstile> {\<lambda>s tr. inv s > r}
+  shows "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. inv s > r}
      Cont ode b
     {\<lambda>s tr. inv s > r}"
   unfolding Valid_def
@@ -361,7 +342,7 @@ theorem Valid_inv_tr_g:
   fixes inv :: "state \<Rightarrow> real"
   assumes "\<forall>x. ((\<lambda>v. inv (vec2state v)) has_derivative g' x) (at x within UNIV)"
       and "\<forall>S. b S \<longrightarrow> g' (state2vec S) (ODE2Vec ode S) \<ge> 0"
-  shows "\<Turnstile> {\<lambda>s tr. inv s > r \<and> P tr \<and> b s}
+  shows "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. inv s > r \<and> P tr \<and> b s}
      Cont ode b
     {\<lambda>s tr. (P @\<^sub>t ode_inv_assn (\<lambda>s. inv s > r)) tr}"
   unfolding Valid_def
@@ -397,7 +378,7 @@ theorem Valid_inv_s_tr_g:
   fixes inv :: "state \<Rightarrow> real"
   assumes "\<forall>x. ((\<lambda>v. inv (vec2state v)) has_derivative g' x) (at x within UNIV)"
       and "\<forall>S. b S \<longrightarrow> g' (state2vec S) (ODE2Vec ode S) \<ge> 0"
-  shows "\<Turnstile> {\<lambda>s tr. inv s > r \<and> P tr \<and> b s}
+  shows "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. inv s > r \<and> P tr \<and> b s}
      Cont ode b
     {\<lambda>s tr. inv s > r \<and> (P @\<^sub>t ode_inv_assn (\<lambda>s. inv s > r)) tr}"
   apply(rule Valid_post_and)
@@ -419,7 +400,7 @@ theorem Valid_inv_s_le:
   fixes inv :: "state \<Rightarrow> real"
   assumes "\<forall>x. ((\<lambda>v. inv (vec2state v)) has_derivative g' x) (at x within UNIV)"
       and "\<forall>S. b S \<longrightarrow> g' (state2vec S) (ODE2Vec ode S) \<le> 0"
-  shows "\<Turnstile> {\<lambda>s tr. inv s \<le> r}
+  shows "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. inv s \<le> r}
      Cont ode b
     {\<lambda>s tr. inv s \<le> r}"
   unfolding Valid_def
@@ -450,7 +431,7 @@ theorem Valid_inv_tr_le:
   fixes inv :: "state \<Rightarrow> real"
   assumes "\<forall>x. ((\<lambda>v. inv (vec2state v)) has_derivative g' x) (at x within UNIV)"
       and "\<forall>S. b S \<longrightarrow> g' (state2vec S) (ODE2Vec ode S) \<le> 0"
-  shows "\<Turnstile> {\<lambda>s tr. inv s \<le> r \<and> P tr \<and> b s}
+  shows "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. inv s \<le> r \<and> P tr \<and> b s}
      Cont ode b
     {\<lambda>s tr. (P @\<^sub>t ode_inv_assn (\<lambda>s. inv s \<le> r)) tr}"
   unfolding Valid_def
@@ -487,7 +468,7 @@ theorem Valid_inv_s_tr_le:
   fixes inv :: "state \<Rightarrow> real"
   assumes "\<forall>x. ((\<lambda>v. inv (vec2state v)) has_derivative g' x) (at x within UNIV)"
       and "\<forall>S. b S \<longrightarrow> g' (state2vec S) (ODE2Vec ode S) \<le> 0"
-  shows "\<Turnstile> {\<lambda>s tr. inv s \<le> r \<and> P tr \<and> b s}
+  shows "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. inv s \<le> r \<and> P tr \<and> b s}
      Cont ode b
     {\<lambda>s tr. inv s \<le> r \<and> (P @\<^sub>t ode_inv_assn (\<lambda>s. inv s \<le> r)) tr}"
   apply(rule Valid_post_and)
@@ -508,7 +489,7 @@ theorem Valid_inv_s_l:
   fixes inv :: "state \<Rightarrow> real"
   assumes "\<forall>x. ((\<lambda>v. inv (vec2state v)) has_derivative g' x) (at x within UNIV)"
       and "\<forall>S. b S \<longrightarrow> g' (state2vec S) (ODE2Vec ode S) \<le> 0"
-  shows "\<Turnstile> {\<lambda>s tr. inv s < r}
+  shows "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. inv s < r}
      Cont ode b
     {\<lambda>s tr. inv s < r}"
   unfolding Valid_def
@@ -539,7 +520,7 @@ theorem Valid_inv_tr_l:
   fixes inv :: "state \<Rightarrow> real"
   assumes "\<forall>x. ((\<lambda>v. inv (vec2state v)) has_derivative g' x) (at x within UNIV)"
       and "\<forall>S. b S \<longrightarrow> g' (state2vec S) (ODE2Vec ode S) \<le> 0"
-  shows "\<Turnstile> {\<lambda>s tr. inv s < r \<and> P tr \<and> b s}
+  shows "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. inv s < r \<and> P tr \<and> b s}
      Cont ode b
     {\<lambda>s tr. (P @\<^sub>t ode_inv_assn (\<lambda>s. inv s < r)) tr}"
   unfolding Valid_def
@@ -576,7 +557,7 @@ theorem Valid_inv_s_tr_l:
   fixes inv :: "state \<Rightarrow> real"
   assumes "\<forall>x. ((\<lambda>v. inv (vec2state v)) has_derivative g' x) (at x within UNIV)"
       and "\<forall>S. b S \<longrightarrow> g' (state2vec S) (ODE2Vec ode S) \<le> 0"
-  shows "\<Turnstile> {\<lambda>s tr. inv s < r \<and> P tr \<and> b s}
+  shows "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. inv s < r \<and> P tr \<and> b s}
      Cont ode b
     {\<lambda>s tr. inv s < r \<and> (P @\<^sub>t ode_inv_assn (\<lambda>s. inv s < r)) tr}"
   apply(rule Valid_post_and)
@@ -602,7 +583,7 @@ theorem Valid_ode_unique_solution_s_sp:
                 \<not>b (p s (d s)) \<and> p s 0 = s"
     and "local_lipschitz {- 1<..} UNIV (\<lambda>(t::real) v. ODE2Vec ode (vec2state v))"
     and "\<And>s. P s \<Longrightarrow> b s"
-  shows "\<Turnstile>
+  shows "\<Turnstile>\<^sub>H\<^sub>L
     {\<lambda>s t. P s}
       Cont ode b
     {\<lambda>s t. \<exists>s'. s = p s' (d s') \<and> P s'}"
@@ -641,7 +622,7 @@ theorem Valid_inv_new_s_g:
   fixes inv :: "state \<Rightarrow> real"
   assumes "\<forall>x. ((\<lambda>v. inv (vec2state v)) has_derivative g' x) (at x within UNIV)"
       and "\<forall>S. b S \<longrightarrow> inv S \<ge> r \<longrightarrow> g' (state2vec S) (ODE2Vec ode S) \<ge> 0"
-  shows "\<Turnstile> {\<lambda>s tr. inv s > r}
+  shows "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. inv s > r}
      Cont ode b
     {\<lambda>s tr. inv s > r}"
   unfolding Valid_def
@@ -677,7 +658,7 @@ text \<open>
 theorem Valid_inv_b_s_ge:
   fixes b :: "state \<Rightarrow> real"
   assumes "\<forall>x. ((\<lambda>v. b (vec2state v)) has_derivative g' x) (at x within UNIV)"
-  shows "\<Turnstile> {\<lambda>s tr. b s > r}
+  shows "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. b s > r}
      Cont ode (\<lambda> s. b s > r)
     {\<lambda>s tr. b s = r}"
   unfolding Valid_def
@@ -717,7 +698,7 @@ text \<open>
 theorem Valid_inv_b_tr_ge:
   fixes b :: "state \<Rightarrow> real"
   assumes "\<forall>x. ((\<lambda>v. b (vec2state v)) has_derivative g' x) (at x within UNIV)"
-  shows "\<Turnstile> {\<lambda>s tr. P tr \<and> b s > r}
+  shows "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. P tr \<and> b s > r}
      Cont ode (\<lambda> s. b s > r)
     {\<lambda>s tr. (P @\<^sub>t ode_inv_assn (\<lambda>s. b s \<ge> r)) tr}"
   unfolding Valid_def
@@ -763,7 +744,7 @@ text \<open>
 theorem Valid_inv_b_s_tr_ge:
   fixes b :: "state \<Rightarrow> real"
   assumes "\<forall>x. ((\<lambda>v. b (vec2state v)) has_derivative g' x) (at x within UNIV)"
-  shows "\<Turnstile> {\<lambda>s tr. P tr \<and> b s > r}
+  shows "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. P tr \<and> b s > r}
      Cont ode (\<lambda>s. b s > r)
     {\<lambda>s tr. b s = r \<and> (P @\<^sub>t ode_inv_assn (\<lambda>s. b s \<ge> r)) tr}"
   apply(rule Valid_post_and)
@@ -784,7 +765,7 @@ theorem Valid_inv_b_s_ge_and_ge:
   fixes b2 :: "state \<Rightarrow> real"
   assumes "\<forall>x. ((\<lambda>v. b1 (vec2state v)) has_derivative g1' x) (at x within UNIV)"
       and "\<forall>x. ((\<lambda>v. b2 (vec2state v)) has_derivative g2' x) (at x within UNIV)"
-  shows "\<Turnstile> {\<lambda>s tr. b1 s > r1 \<and> b2 s > r2}
+  shows "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. b1 s > r1 \<and> b2 s > r2}
      Cont ode (\<lambda> s. b1 s > r1 \<and> b2 s > r2)
     {\<lambda>s tr. b1 s = r1 \<or> b2 s = r2}"
   unfolding Valid_def
@@ -853,7 +834,7 @@ theorem Valid_inv_b_tr_ge_and_ge:
   fixes b2 :: "state \<Rightarrow> real"
   assumes "\<forall>x. ((\<lambda>v. b1 (vec2state v)) has_derivative g1' x) (at x within UNIV)"
       and "\<forall>x. ((\<lambda>v. b2 (vec2state v)) has_derivative g2' x) (at x within UNIV)"
-  shows "\<Turnstile> {\<lambda>s tr. P tr \<and> b1 s > r1 \<and> b2 s > r2}
+  shows "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. P tr \<and> b1 s > r1 \<and> b2 s > r2}
      Cont ode (\<lambda> s. b1 s > r1 \<and> b2 s > r2)
     {\<lambda>s tr. (P @\<^sub>t ode_inv_assn (\<lambda>s. b1 s \<ge> r1 \<and> b2 s \<ge> r2)) tr}"
   unfolding Valid_def
@@ -1006,7 +987,7 @@ theorem Valid_inv_b_s_tr_ge_and_ge:
   fixes b2 :: "state \<Rightarrow> real"
   assumes "\<forall>x. ((\<lambda>v. b1 (vec2state v)) has_derivative g1' x) (at x within UNIV)"
       and "\<forall>x. ((\<lambda>v. b2 (vec2state v)) has_derivative g2' x) (at x within UNIV)"
-  shows "\<Turnstile> {\<lambda>s tr. P tr \<and> b1 s > r1 \<and> b2 s > r2}
+  shows "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. P tr \<and> b1 s > r1 \<and> b2 s > r2}
      Cont ode (\<lambda> s. b1 s > r1 \<and> b2 s > r2)
     {\<lambda>s tr. (b1 s = r1 \<or> b2 s = r2) \<and> (P @\<^sub>t ode_inv_assn (\<lambda>s. b1 s \<ge> r1 \<and> b2 s \<ge> r2)) tr}"
   apply(rule Valid_post_and)
@@ -1024,7 +1005,7 @@ text \<open>
 theorem Valid_inv_b_s_le:
   fixes b :: "state \<Rightarrow> real"
   assumes "\<forall>x. ((\<lambda>v. b (vec2state v)) has_derivative g' x) (at x within UNIV)"
-  shows "\<Turnstile> {\<lambda>s tr. b s < r}
+  shows "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. b s < r}
      Cont ode (\<lambda> s. b s < r)
     {\<lambda>s tr. b s = r}"
   unfolding Valid_def
@@ -1061,7 +1042,7 @@ theorem Valid_inv_b_s_le:
 theorem Valid_inv_b_tr_le:
   fixes b :: "state \<Rightarrow> real"
   assumes "\<forall>x. ((\<lambda>v. b (vec2state v)) has_derivative g' x) (at x within UNIV)"
-  shows "\<Turnstile> {\<lambda>s tr. P tr \<and> b s < r}
+  shows "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. P tr \<and> b s < r}
      Cont ode (\<lambda> s. b s < r)
     {\<lambda>s tr. (P @\<^sub>t ode_inv_assn (\<lambda>s. b s \<le> r)) tr}"
   unfolding Valid_def
@@ -1104,7 +1085,7 @@ theorem Valid_inv_b_tr_le:
 theorem Valid_inv_b_s_tr_le:
   fixes b :: "state \<Rightarrow> real"
   assumes "\<forall>x. ((\<lambda>v. b (vec2state v)) has_derivative g' x) (at x within UNIV)"
-  shows "\<Turnstile> {\<lambda>s tr. P tr \<and> b s < r}
+  shows "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. P tr \<and> b s < r}
      Cont ode (\<lambda>s. b s < r)
     {\<lambda>s tr. b s = r \<and> (P @\<^sub>t ode_inv_assn (\<lambda>s. b s \<le> r)) tr}"
   apply(rule Valid_post_and)
@@ -1123,15 +1104,15 @@ text \<open>
 \<close>
 theorem DC':
   assumes
-    "\<Turnstile> {\<lambda>s tr. init s \<and> P tr \<and> b s}
+    "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. init s \<and> P tr \<and> b s}
          Cont ode b
         {\<lambda>s tr. c s \<and> (P @\<^sub>t ode_inv_assn c) tr}"
   and
-    "\<Turnstile> {\<lambda>s tr. init s \<and> P tr \<and> (\<lambda>s. b s \<and> c s) s}
+    "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. init s \<and> P tr \<and> (\<lambda>s. b s \<and> c s) s}
          Cont ode (\<lambda>s. b s \<and> c s)
         {\<lambda>s tr. d s \<and> (P @\<^sub>t ode_inv_assn d) tr}"
   shows
-    "\<Turnstile> {\<lambda>s tr. init s \<and> P tr \<and> b s}
+    "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. init s \<and> P tr \<and> b s}
          Cont ode b
         {\<lambda>s tr. d s \<and> (P @\<^sub>t ode_inv_assn d) tr}"
   unfolding Valid_def
@@ -1207,15 +1188,15 @@ text \<open>
 \<close>
 theorem DC'':
   assumes
-    "\<Turnstile> {\<lambda>s tr. init s \<and> P tr \<and> b s}
+    "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. init s \<and> P tr \<and> b s}
          Cont ode b
         {\<lambda>s tr. (P @\<^sub>t ode_inv_assn c) tr}"
   and
-    "\<Turnstile> {\<lambda>s tr. init s \<and> (\<lambda>s. b s \<and> c s) s}
+    "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. init s \<and> (\<lambda>s. b s \<and> c s) s}
          Cont ode (\<lambda>s. b s \<and> c s)
         {\<lambda>s tr. d s}"
   shows
-    "\<Turnstile> {\<lambda>s tr. init s \<and> P tr \<and> b s}
+    "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. init s \<and> P tr \<and> b s}
          Cont ode b
         {\<lambda>s tr. d s }"
   unfolding Valid_def
@@ -1256,15 +1237,15 @@ theorem DC'':
 
 theorem DC''g:
   assumes
-    "\<Turnstile> {\<lambda>s tr. init s \<and> P tr \<and> b s}
+    "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. init s \<and> P tr \<and> b s}
          Cont ode b
         {\<lambda>s tr. (P @\<^sub>t ode_inv_assn c) tr}"
   and
-    "\<Turnstile> {\<lambda>s tr. init s \<and> P tr \<and> (\<lambda>s. b s \<and> c s) s}
+    "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. init s \<and> P tr \<and> (\<lambda>s. b s \<and> c s) s}
          Cont ode b
         {\<lambda> s tr. (c s \<and> (P @\<^sub>t ode_inv_assn c) tr) \<longrightarrow> d s tr}"
   shows
-    "\<Turnstile> {\<lambda>s tr. init s \<and> P tr \<and> b s}
+    "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. init s \<and> P tr \<and> b s}
          Cont ode b
         {d}"
   unfolding Valid_def
@@ -1308,15 +1289,15 @@ text \<open>
 \<close>
 theorem DC''':
   assumes
-    "\<Turnstile> {\<lambda>s tr. init s \<and> P tr \<and> b s}
+    "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. init s \<and> P tr \<and> b s}
          Cont ode b
         {\<lambda>s tr. (P @\<^sub>t ode_inv_assn c) tr}"
   and
-    "\<Turnstile> {\<lambda>s tr. init s \<and> (\<lambda>s. b s \<and> c s) s}
+    "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. init s \<and> (\<lambda>s. b s \<and> c s) s}
          Cont ode (\<lambda>s. b s \<and> c s)
         {\<lambda>s tr. d s}"
   shows
-    "\<Turnstile> {\<lambda>s tr. init s \<and> P tr \<and> b s}
+    "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. init s \<and> P tr \<and> b s}
          Cont ode b
         {\<lambda>s tr. c s \<and> d s }"
   unfolding Valid_def
@@ -1389,15 +1370,15 @@ subgoal premises pre for tr T p
 
 theorem DC'''g:
   assumes
-    "\<Turnstile> {\<lambda>s tr. init s \<and> P tr \<and> b s}
+    "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. init s \<and> P tr \<and> b s}
          Cont ode b
         {\<lambda>s tr. (P @\<^sub>t ode_inv_assn c) tr}"
   and
-    "\<Turnstile> {\<lambda>s tr. init s \<and> P tr \<and> (\<lambda>s. b s \<and> c s) s}
+    "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. init s \<and> P tr \<and> (\<lambda>s. b s \<and> c s) s}
          Cont ode (\<lambda>s. b s)
         {\<lambda>s tr. (c s \<and> (P @\<^sub>t ode_inv_assn c) tr) \<longrightarrow> d s tr}"
   shows
-    "\<Turnstile> {\<lambda>s tr. init s \<and> P tr \<and> b s}
+    "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. init s \<and> P tr \<and> b s}
          Cont ode b
         {\<lambda>s tr. c s \<and> d s tr}"
   unfolding Valid_def
@@ -1798,7 +1779,7 @@ theorem Valid_dbx_s_eq:
   assumes "\<forall>x. ((\<lambda>v. inv (vec2state v)) has_derivative g' x) (at x within UNIV)"
       and "(\<lambda>S. g' (state2vec S) (ODE2Vec ode S)) = (\<lambda> S. g S * inv S)"
       and "continuous_on UNIV (\<lambda> v. g (vec2state v))"
-  shows "\<Turnstile> {\<lambda>s tr. inv s = 0}
+  shows "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. inv s = 0}
      Cont ode b
     {\<lambda>s tr. inv s = 0}"
 unfolding Valid_def
@@ -1850,7 +1831,7 @@ theorem Valid_dbx_s_g:
   assumes "\<forall>x. ((\<lambda>v. inv (vec2state v)) has_derivative g' x) (at x within UNIV)"
       and "(\<lambda>S. g' (state2vec S) (ODE2Vec ode S)) = (\<lambda> S. g S * inv S)"
       and "continuous_on UNIV (\<lambda> v. g (vec2state v))"
-  shows "\<Turnstile> {\<lambda>s tr. inv s > 0}
+  shows "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. inv s > 0}
      Cont ode b
     {\<lambda>s tr. inv s > 0}"
 unfolding Valid_def
@@ -1902,7 +1883,7 @@ theorem Valid_dbx_s_l:
   assumes "\<forall>x. ((\<lambda>v. inv (vec2state v)) has_derivative g' (x)) (at x within UNIV)"
       and "(\<lambda> S .  g' (state2vec S) (ODE2Vec ode S)) = (\<lambda> S. g S * inv S)"
       and "continuous_on UNIV (\<lambda> v. g (vec2state v))"
-  shows "\<Turnstile> {\<lambda>s tr. inv s < 0}
+  shows "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. inv s < 0}
      Cont ode b
     {\<lambda>s tr. inv s < 0}"
 unfolding Valid_def
@@ -2099,7 +2080,7 @@ theorem Valid_dbxg_s_g:
   assumes "\<forall>x. ((\<lambda>v. inv (vec2state v)) has_derivative g' x) (at x within UNIV)"
       and "\<And> S. b S \<Longrightarrow> g' (state2vec S) (ODE2Vec ode S) \<ge> (g S * inv S)"
       and "continuous_on UNIV (\<lambda> v. g (vec2state v))"
-  shows "\<Turnstile> {\<lambda>s tr. inv s > 0}
+  shows "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. inv s > 0}
      Cont ode b
     {\<lambda>s tr. inv s > 0}"
   unfolding Valid_def
@@ -2147,7 +2128,7 @@ theorem Valid_dbxg_s_ge:
   assumes "\<forall>x. ((\<lambda>v. inv (vec2state v)) has_derivative g' (x)) (at x within UNIV)"
       and "\<And> S. b S \<Longrightarrow> (g' (state2vec S) (ODE2Vec ode S)) \<ge> ( g S * inv S)"
       and "continuous_on UNIV (\<lambda> v. g (vec2state v))"
-  shows "\<Turnstile> {\<lambda>s tr. inv s \<ge> 0}
+  shows "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. inv s \<ge> 0}
      Cont ode b
     {\<lambda>s tr. inv s \<ge> 0}"
   unfolding Valid_def

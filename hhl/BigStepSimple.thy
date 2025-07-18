@@ -254,6 +254,21 @@ lemma wait_le_zero [simp]:
     by (auto intro: wait_assn.intros)
   done
 
+inductive ode_inv_assn :: "(state \<Rightarrow> bool) \<Rightarrow> tassn" where
+  "\<forall>t\<in>{0..d::real}. f (p t) \<Longrightarrow> ode_inv_assn f [WaitBlk d (\<lambda>\<tau>. State (p \<tau>)) ({}, {})]"
+
+inductive_cases ode_inv_assn_elim: "ode_inv_assn f tr"
+
+lemma ode_inv_assn_implie: "ode_inv_assn c [WaitBlk (ereal d) (\<lambda>\<tau>. State (p \<tau>)) ({}, {})] \<Longrightarrow>
+       \<forall>t\<in>{0..d}. c (p t)"
+  apply (elim ode_inv_assn_elim)
+  apply auto
+  subgoal for d p' t
+    apply (frule WaitBlk_cong)
+    apply (frule WaitBlk_cong2)
+    by auto
+  done
+
 text \<open>Simpler forms of weakest precondition\<close>
 
 theorem Valid_send':

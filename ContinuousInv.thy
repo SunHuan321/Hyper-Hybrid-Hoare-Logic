@@ -1,7 +1,8 @@
 theory ContinuousInv
-  imports Logic
+  imports Logic "HHL/BigStepSimple"
 begin
 
+(*
 lemma chainrule_Pair:
   assumes "\<forall>x. ((\<lambda>vv. g (vec2state_Pair vv)) has_derivative g' (vec2state_Pair x)) (at x within UNIV)"
     and "ODEsol ode p1 d" 
@@ -22,14 +23,13 @@ proof-
         "(\<lambda>t. state2vec_Pair (p1 t, p2 t))" "{0 .. d}" t "(\<lambda>s. s *\<^sub>R ODE2Vec_Pair ode (p1 t, p2 t))"]
   by auto
 qed
+*)
 
 lemma chainrule_k:
   assumes "\<forall>x. ((\<lambda>v. g (vec2state_k v)) has_derivative g' (vec2state_k x)) (at x within UNIV)"
     and "\<forall>k. ODEsol ode (ps k) d"
     and "t \<in> {0 .. d}"
   shows "((\<lambda>t. g (\<lambda>i. ps i t)) has_derivative (\<lambda>s. g' (\<lambda>i. ps i t) (s *\<^sub>R ODE2Vec_k ode (\<lambda>i. ps i t)))) (at t within {0..d})"
-  using has_derivative_in_compose2[of UNIV "(\<lambda>v. g (vec2state_k v))" "(\<lambda>v. g' (vec2state_k v))" 
-        "(\<lambda>t. state2vec_k (\<lambda>i. ps i t))" "{0 .. d}" t "(\<lambda>s. s *\<^sub>R ODE2Vec_k ode (\<lambda>i. ps i t))"]
 proof -
   have 1: "(\<And>x. x \<in> UNIV \<Longrightarrow> ((\<lambda>v. g (vec2state_k v)) has_derivative g' (vec2state_k x)) (at x))"
     using assms(1) by auto
@@ -44,6 +44,27 @@ proof -
 qed
 
 
+lemma chainrule_k':
+  assumes "\<forall>x. ((\<lambda>v. g (vec2state_k v)) has_derivative g' (vec2state_k x)) (at x within UNIV)"
+    and "(\<forall>k. ((\<lambda>t. state2vec (ps k t)) has_vderiv_on (\<lambda>t. ODE2Vec ode (ps k t))) {-e..d + e})"
+    and "e>0"
+    and "t \<in> {-e .. d+e}"
+  shows "((\<lambda>t. g (\<lambda>i. ps i t)) has_derivative (\<lambda>s. g' (\<lambda>i. ps i t) (s *\<^sub>R ODE2Vec_k ode (\<lambda>i. ps i t)))) (at t within {-e .. d+e})"
+proof-
+    have 1: "(\<And>x. x \<in> UNIV \<Longrightarrow> ((\<lambda>v. g (vec2state_k v)) has_derivative g' (vec2state_k x)) (at x))"
+      using assms(1) by auto
+    have 2: "-e \<le> t \<and> t \<le> d+e"
+      using assms(3) assms(4) by auto
+    have 3: "\<forall>t \<in>{- e..d + e}. ((\<lambda>t. state2vec_k (\<lambda>i. ps i t)) has_derivative (\<lambda>s. s *\<^sub>R ODE2Vec_k ode (\<lambda>i. ps i t))) (at t within {- e..d + e})"
+      using ODEsol_old_k'[of ps ode "{- e..d + e}"]
+      assms(2) unfolding has_vderiv_on_def has_vector_derivative_def by auto
+    show ?thesis
+      using 1 2 3 has_derivative_in_compose2[of UNIV "(\<lambda>v. g (vec2state_k v))" "(\<lambda>v. g' (vec2state_k v))" 
+        "(\<lambda>t. state2vec_k (\<lambda>i. ps i t))" "{-e .. d+e}" t "(\<lambda>s. s *\<^sub>R ODE2Vec_k ode (\<lambda>i. ps i t))"]
+      by auto
+  qed
+
+(*
 theorem Valid_inv_Pair:
   fixes inv :: "(state \<times> state) \<Rightarrow> real"
   assumes "\<forall>x. ((\<lambda>vv. inv (vec2state_Pair vv)) has_derivative G' x) (at x within UNIV)"
@@ -212,6 +233,7 @@ theorem Valid_inv_Pair_forall:
       by auto
   qed
   done
+*)
 
 lemma in_sem_k: "\<lbrakk>\<forall>k. ess k \<in> sem C S\<rbrakk> \<Longrightarrow>
       \<exists>ess' trs. (\<forall>k. ess' k \<in> S \<and> big_step C (pproj (ess' k)) (trs k) (pproj (ess k)) \<and>
@@ -226,23 +248,52 @@ proof-
     by metis
 qed
 
-lemma finite_arg_min:
-  fixes ds :: "'k::finite \<Rightarrow> real"
-  shows "\<exists>k. \<forall>k'. ds k \<le> ds k'"
-proof -
-  let ?S = "range ds"
-  have "finite ?S" by simp
-  then have "?S \<noteq> {}" by auto
-  then have "Min ?S \<in> ?S"
-    using \<open>finite ?S\<close> by simp
-  then obtain k where "ds k = Min ?S"
-    by force
-  then show ?thesis
-    by (metis Min_le \<open>finite (range ds)\<close> rangeI)
-qed
-
+(*
 definition ex2s_k :: "('k \<Rightarrow> ('lvar, 'lval) exstate) \<Rightarrow> ('k \<Rightarrow> state)" where
   "ex2s_k ess k = pproj (ess k)"
+
+definition ex2t_k :: "('k \<Rightarrow> ('lvar, 'lval) exstate) \<Rightarrow> ('k \<Rightarrow> trace)" where
+  "ex2t_k ess k = tproj (ess k)"
+*)
+
+lemma inv_chain_k:
+  fixes inv :: "(('k :: finite) \<Rightarrow> state) \<Rightarrow> real"
+  assumes "\<forall>x. ((\<lambda>v. inv (vec2state_k v)) has_derivative G' x) (at x within UNIV)"
+      and "\<forall>k. ODEsol ode (ps k) d"
+    shows "\<forall>t \<in> {0 .. d}. ((\<lambda>t. inv (\<lambda>k. ps k t)) has_derivative 
+          (\<lambda>s. s *\<^sub>R G' (state2vec_k (\<lambda>k. ps k t)) (1 *\<^sub>R ODE2Vec_k ode (\<lambda>k. ps k t)))) (at t within {0 ..d})"
+proof-
+  have 1: "\<forall>t \<in> {0 .. d}. ((\<lambda>t. inv (\<lambda>k. ps k t)) has_derivative 
+          (\<lambda>s. G' (state2vec_k (\<lambda>k. ps k t)) (s *\<^sub>R ODE2Vec_k ode (\<lambda>k. ps k t)))) (at t within {0 .. d})"
+    using assms chainrule_k[of inv "\<lambda>x. G'(state2vec_k x)" ode ps d] by auto
+  then have 2: "\<forall>s. G' (state2vec_k (\<lambda>k. ps k t)) (s *\<^sub>R ODE2Vec_k ode (\<lambda>k. ps k t)) = 
+                s *\<^sub>R G' (state2vec_k (\<lambda>k. ps k t)) (1 *\<^sub>R ODE2Vec_k ode (\<lambda>k. ps k t))" if "t\<in>{0 .. d}" for t
+    unfolding has_derivative_def bounded_linear_def 
+    using that linear_iff[of "(\<lambda>s. G' (state2vec_k (\<lambda>k. ps k t)) (s *\<^sub>R ODE2Vec_k ode (\<lambda>k. ps k t)))"]
+    using assms(1) linear_simps(5) by fastforce  
+  with 1 show ?thesis
+    by auto
+qed
+
+lemma inv_chain_k':
+  fixes inv :: "(('k :: finite) \<Rightarrow> state) \<Rightarrow> real"
+  assumes "\<forall>x. ((\<lambda>v. inv (vec2state_k v)) has_derivative G' x) (at x within UNIV)"
+      and "e > 0"
+      and "\<forall>k. ((\<lambda>t. state2vec (ps k t)) has_vderiv_on (\<lambda>t. ODE2Vec ode (ps k t))) {-e..d + e}"
+    shows "\<forall>t \<in> {-e..d + e}. ((\<lambda>t. inv (\<lambda>k. ps k t)) has_derivative 
+          (\<lambda>s. s *\<^sub>R G' (state2vec_k (\<lambda>k. ps k t)) (1 *\<^sub>R ODE2Vec_k ode (\<lambda>k. ps k t)))) (at t within {-e..d + e})"
+proof-
+  have 1: "\<forall>t \<in> {-e .. d + e}. ((\<lambda>t. inv (\<lambda>k. ps k t)) has_derivative 
+          (\<lambda>s. G' (state2vec_k (\<lambda>k. ps k t)) (s *\<^sub>R ODE2Vec_k ode (\<lambda>k. ps k t)))) (at t within {-e..d + e})"
+    using assms chainrule_k'[of inv "\<lambda>x. G'(state2vec_k x)" ps ode e d]  by auto
+  then have 2: "\<forall>s. G' (state2vec_k (\<lambda>k. ps k t)) (s *\<^sub>R ODE2Vec_k ode (\<lambda>k. ps k t)) = 
+                s *\<^sub>R G' (state2vec_k (\<lambda>k. ps k t)) (1 *\<^sub>R ODE2Vec_k ode (\<lambda>k. ps k t))" if "t\<in>{-e .. d + e}" for t
+    unfolding has_derivative_def bounded_linear_def 
+    using that linear_iff[of "(\<lambda>s. G' (state2vec_k (\<lambda>k. ps k t)) (s *\<^sub>R ODE2Vec_k ode (\<lambda>k. ps k t)))"]
+    using assms(1) linear_simps(5) by fastforce  
+  with 1 show ?thesis
+    by auto
+qed
 
 theorem Valid_inv_k:
   fixes inv :: "(('k :: finite) \<Rightarrow> state) \<Rightarrow> real"
@@ -250,7 +301,7 @@ theorem Valid_inv_k:
       and "\<forall>ss. ((\<forall>k. b (ss k)) \<longrightarrow> G' (state2vec_k ss) (ODE2Vec_k ode ss) = 0)"
       and "\<forall>ss. inv ss = r \<longrightarrow> (\<exists>k. \<not> b (ss k)) \<longrightarrow> (\<forall>k'. \<not> b (ss k'))"
     shows "\<Turnstile> {(\<lambda>S. (\<forall>es \<in> S. b (pproj es)) \<and> 
-               (\<forall>ess. (\<forall>k. ess k \<in> S \<and> lproj (ess k) x = k) \<longrightarrow> inv (ex2s_k ess) = r \<and> 
+               (\<forall>ess. (\<forall>k. ess k \<in> S \<and> lproj (ess k) x = k) \<longrightarrow> inv (\<lambda>k. pproj (ess k)) = r \<and> 
                 P (\<lambda>k. tproj (ess k))))} 
               Cont ode b 
               {(\<lambda>S. \<forall>ess. (\<forall>k. ess k \<in> S \<and> lproj (ess k) x = k) \<longrightarrow> 
@@ -260,7 +311,7 @@ theorem Valid_inv_k:
   apply (intro allI impI)
   subgoal for S ess
   proof-
-    assume a0: "(\<forall>es\<in>S. b (pproj es)) \<and> (\<forall>ess. (\<forall>k. ess k \<in> S \<and> lproj (ess k) x = k) \<longrightarrow> inv (ex2s_k ess) = r \<and> P (\<lambda>k. tproj (ess k)))"
+    assume a0: "(\<forall>es\<in>S. b (pproj es)) \<and> (\<forall>ess. (\<forall>k. ess k \<in> S \<and> lproj (ess k) x = k) \<longrightarrow> inv (\<lambda>k. pproj (ess k)) = r \<and> P (\<lambda>k. tproj (ess k)))"
        and a1: " \<forall>k. ess k \<in> sem (Cont ode b) S \<and> lproj (ess k) x = k"
     from a1 have "\<exists>ess' trs. (\<forall>k. ess' k \<in> S \<and> big_step (Cont ode b) (pproj (ess' k)) (trs k) (pproj (ess k)) \<and>
       (lproj (ess' k)) = (lproj (ess k)) \<and> (tproj (ess k)) = (tproj (ess' k)) @ (trs k))"
@@ -270,7 +321,7 @@ theorem Valid_inv_k:
       by auto
     with a1 have b2: "\<forall>k. ess' k \<in> S \<and> lproj (ess' k) x = k"
       by auto
-    with a0 have b3: "inv (ex2s_k ess') = r" "P (\<lambda>k. tproj (ess' k))"
+    with a0 have b3: "inv (\<lambda>k. pproj (ess' k)) = r" "P (\<lambda>k. tproj (ess' k))"
       by blast+
     with a0 b1 have "\<forall>k. (\<exists>p d. d > 0 \<and> ODEsol ode p d \<and> (\<forall>t. t \<ge> 0 \<and> t < d \<longrightarrow> b (p t)) \<and> 
     \<not>b (p d) \<and> p 0 = (pproj (ess' k)) \<and> trs k = [WaitBlk d (\<lambda>\<tau>. State (p \<tau>)) ({}, {})])"
@@ -288,163 +339,49 @@ theorem Valid_inv_k:
     from b4 b5 have b6: "\<forall>k t. t \<ge> 0 \<and> t < ?d \<longrightarrow> b (ps k t)" 
       using order_less_le_trans by blast
     from b3 b4 have b7: "inv (\<lambda>k. ps k 0) = r"
-      by (metis (no_types, lifting) ex2s_k_def ext)
+      by auto
     from b4 b5 have "\<forall>k. ODEsol ode (ps k) ?d"
       by (meson ODEsol_le order_less_le)    
-    then have 1: "\<forall>t \<in> {0 .. ds k'}. ((\<lambda>t. inv (\<lambda>k. ps k t)) has_derivative 
-         (\<lambda>s. G' (state2vec_k (\<lambda>k. ps k t)) (s *\<^sub>R ODE2Vec_k ode (\<lambda>k. ps k t)))) (at t within {0 .. ?d})"
-      using chainrule_k[of inv "\<lambda>x. G'(state2vec_k x)" ode ps ?d ] assms(1)
-      by auto
-    then have 2: "\<forall>s. G' (state2vec_k (\<lambda>k. ps k t)) (s *\<^sub>R ODE2Vec_k ode (\<lambda>k. ps k t)) = 
-                 s *\<^sub>R G' (state2vec_k (\<lambda>k. ps k t)) (1 *\<^sub>R ODE2Vec_k ode (\<lambda>k. ps k t))" if "t\<in>{0 .. ?d}" for t
-      unfolding has_derivative_def bounded_linear_def 
-      using that linear_iff[of "(\<lambda>s. G' (state2vec_k (\<lambda>k. ps k t)) (s *\<^sub>R ODE2Vec_k ode (\<lambda>k. ps k t)))"]
-      using assms(1) linear_simps(5) by fastforce      
-    have 3: "\<forall>s. (s *\<^sub>R 1) = s" by simp
-    have 4: "\<forall>s. G' (state2vec_k (\<lambda>k. ps k t)) (s *\<^sub>R ODE2Vec_k ode (\<lambda>k. ps k t)) = 
-             s *\<^sub>R G' (state2vec_k (\<lambda>k. ps k t)) (1 *\<^sub>R ODE2Vec_k ode (\<lambda>k. ps k t))" if "t\<in>{0 .. ?d}" for t
-      using 2 3 that by auto
-    have 5: "\<forall>s. G' (state2vec_k (\<lambda>k. ps k t)) (s *\<^sub>R ODE2Vec_k ode (\<lambda>k. ps k t)) = 0" if "t\<in>{0 ..<?d}" for t
-      using 4 assms(2) b6 that by auto
-    then have 6: "\<forall>t\<in>{0..?d}. inv (\<lambda>k. ps k t) = r"
-      using mvt_real_eq[of ?d "(\<lambda>t. inv (\<lambda>k. ps k t))""\<lambda>t. (\<lambda>s. G' (state2vec_k (\<lambda>k. ps k t)) (s *\<^sub>R ODE2Vec_k ode (\<lambda>k. ps k t)))"]
-      using 1 5 b7 by auto
+    then have 1: "\<forall>t \<in> {0 .. ?d}. ((\<lambda>t. inv (\<lambda>k. ps k t)) has_derivative 
+         (\<lambda>s. s *\<^sub>R G' (state2vec_k (\<lambda>k. ps k t)) (1 *\<^sub>R ODE2Vec_k ode (\<lambda>k. ps k t)))) (at t within {0 .. ?d})"
+      using inv_chain_k[of inv G' ode ps ?d] assms(1) by auto
+    have 2: "\<forall>t\<in>{0..<ds k'}. \<forall>s. s *\<^sub>R G' (state2vec_k (\<lambda>k. ps k t)) (1 *\<^sub>R ODE2Vec_k ode (\<lambda>k. ps k t)) = 0"
+      using assms(2) b6 by auto
+    then have 3: "\<forall>t\<in>{0..?d}. inv (\<lambda>k. ps k t) = r"
+      using mvt_real_eq[of ?d "(\<lambda>t. inv (\<lambda>k. ps k t))" "\<lambda>t. (\<lambda>s. s *\<^sub>R G' (state2vec_k (\<lambda>k. ps k t)) (1 *\<^sub>R ODE2Vec_k ode (\<lambda>k. ps k t)))"]
+      using 1 b7 by auto
     with b4 have "inv (\<lambda>k. ps k ?d) = r"
       by (meson ODEsol_def atLeastAtMost_iff b4 dual_order.refl)
     with assms(3) b4 have "\<forall>k. \<not> b (ps k ?d)"
       by blast
     with b4 b5 have "\<forall>k. ds k = ?d"
       by (metis order_less_le)
-    with b1 b4 b3(2) 6 show ?thesis
-      apply (rule_tac x = ps in exI, rule_tac x = ?d in exI, rule_tac x = "(\<lambda>k. tproj (ess' k))" in exI)
+    with b1 b4 b3(2) 3 show ?thesis
+      apply (rule_tac x = ps in exI, rule_tac x = ?d in exI, rule_tac x = "\<lambda>k. tproj (ess' k)" in exI)
       by metis
   qed
   done
 
-
-
-
-
-
-(*
-
-definition state2vec_k :: "(('k :: finite) \<Rightarrow> state) \<Rightarrow> real^('k \<times> var)"
-  where "state2vec_k ss = (\<chi> x. ss (fst x) (snd x))"
-
-definition vec2state_k :: "real^(('k :: finite) \<times> char) \<Rightarrow>('k \<Rightarrow> state) "
-  where "(vec2state_k V) k v = V $ (k, v)"
-
-lemma vec_state_map1_k[simp]: "vec2state_k (state2vec_k s) = s"
-  unfolding vec2state_k_def state2vec_k_def by auto
-
-lemma vec_state_map2_k[simp]: "state2vec_k (vec2state_k s) = s"
-  unfolding vec2state_k_def state2vec_k_def by auto
-
-text \<open>Mutiple traces\<close>
-thm sum_divide_distrib
-
-fun ODE2Vec_k :: "ODE \<Rightarrow> (('k :: finite) \<Rightarrow> state) \<Rightarrow> (real^('k \<times> var))" where
-  "ODE2Vec_k (ODE f) ss = state2vec_k (\<lambda>k. \<lambda>x. f x (ss k))"
-
-lemma "ODEsol (ODE f) (ps k) d \<Longrightarrow> 
-      ((\<lambda>t. state2vec (ps k t)) has_vderiv_on (\<lambda>t. ODE2Vec (ODE f) (ps k t))) {0..d}"
-  using ODEsol_old[of "ODE f" "ps k" d] by auto
-
-lemma ODEsol_old_k:
-  "\<lbrakk>\<forall>k. ((\<lambda>t. state2vec (ps k t)) has_vderiv_on (\<lambda>t. ODE2Vec (ODE f) (ps k t))) {0..d}\<rbrakk> 
-  \<Longrightarrow> ((\<lambda>t. state2vec_k (\<lambda>k. ps k t)) has_vderiv_on (\<lambda>t. ODE2Vec_k (ODE f) (\<lambda>k. ps k t))) {0 .. d}"
-  apply (simp add: state2vec_k_def ODEsol_old)
-
-lemma ODEsol_old_k:
-  assumes "\<forall>k. ODEsol ode (ps k) d"
-  shows "((\<lambda>t. state2vec_k (\<lambda>k. ps k t)) has_vderiv_on (\<lambda>t. ODE2Vec_k ode (\<lambda>k. ps k t))) {0 .. d}"
-proof-
-  have "\<exists>f. ode = ODE f"
-    by (meson ODE.exhaust)
-
-lemma chainrule_k:
-  assumes "\<forall>x. ((\<lambda>v. g (vec2state_k v)) has_derivative g' (vec2state_k x)) (at x within UNIV)"
-    and "\<forall>k. ODEsol ode (ps k) d"
-    and "t \<in> {0 .. d}"
-  shows "((\<lambda>t. g (\<lambda>i. ps i t)) has_derivative (\<lambda>s. g' (\<lambda>i. ps i t) (s *\<^sub>R ODE2Vec_k ode (\<lambda>i. ps i t)))) (at t within {0..d})"
-  using has_derivative_in_compose2[of UNIV "(\<lambda>v. g (vec2state_k v))" "(\<lambda>v. g' (vec2state_k v))" 
-        "(\<lambda>t. state2vec_k (\<lambda>i. ps i t))" "{0 .. d}" t "(\<lambda>s. s *\<^sub>R ODE2Vec_k ode (\<lambda>i. ps i t))"]
-proof -
-  have 1: "(\<And>x. x \<in> UNIV \<Longrightarrow> ((\<lambda>v. g (vec2state_k v)) has_derivative g' (vec2state_k x)) (at x))"
-    using assms(1) by auto
-  have 2: "0 \<le> t \<and> t \<le> d"
-    using assms(3) by auto
-  have 3: "((\<lambda>t. state2vec_k (\<lambda>i. ps i t)) has_derivative (\<lambda>s. s *\<^sub>R ODE2Vec_k ode (\<lambda>i. ps i t))) (at t within {0..d})"
-    using 2 assms(2) using ODEsol_old_k[OF assms(2)]unfolding ODEsol_def has_vderiv_on_def has_vector_derivative_def by auto
-  show ?thesis
-  using 1 2 3 has_derivative_in_compose2[of UNIV "(\<lambda>v. g (vec2state_k v))" "(\<lambda>v. g' (vec2state_k v))" 
-        "(\<lambda>t. state2vec_k (\<lambda>i. ps i t))" "{0 .. d}" t "(\<lambda>s. s *\<^sub>R ODE2Vec_k ode (\<lambda>i. ps i t))"]
-  by auto
-qed
-
-
-definition k_sem where
-  "k_sem C states states' \<longleftrightarrow> (\<forall>i. (fst (states i) = fst (states' i) \<and> 
-   (snd (states' i)) \<in> sem C (snd (states i))))"
-
-lemma k_semI:
-  assumes "\<And>i. (fst (states i) = fst (states' i) \<and> (snd (states' i)) \<in> sem C (snd (states i)) )"
-  shows "k_sem C states states'"
-  by (simp add: assms k_sem_def)
-
-lemma k_semE:
-  assumes "k_sem C states states'"
-  shows "fst (states i) = fst (states' i) \<and> (snd (states' i)) \<in> sem C (snd (states i))"
-  using assms k_sem_def by fastforce
-
-definition ess2ss :: "('k \<Rightarrow> ('lvar, 'lval) exstate) \<Rightarrow> ('k \<Rightarrow> state)" where
-  "ess2ss ess k = pproj (ess k)"
-
-lemma in_sem_k: "\<lbrakk>\<forall>k. ess k \<in> sem C S\<rbrakk> \<Longrightarrow>
-      \<exists>ess' trs. (\<forall>k. ess' k \<in> S \<and> big_step C (pproj (ess' k)) (trs k) (pproj (ess k)) \<and>
-      (lproj (ess' k)) = (lproj (ess k)) \<and> (tproj (ess k)) = (tproj (ess' k)) @ (trs k))"
-proof-
-  assume a0: "\<forall>k. ess k \<in> sem C S"
-  then have "\<forall>k. (\<exists>es tr. es \<in> S \<and> big_step C (pproj es) tr (pproj (ess k)) \<and> 
-             (lproj es) = (lproj (ess k)) \<and> (tproj (ess k)) = (tproj es) @ tr)"
-    apply (simp add: in_sem lproj_def tproj_def pproj_def)
-    by blast
-  then show ?thesis
-    by metis
-qed
-
-lemma finite_arg_min:
-  fixes ds :: "'k::finite \<Rightarrow> real"
-  shows "\<exists>k. \<forall>k'. ds k \<le> ds k'"
-proof -
-  let ?S = "range ds"
-  have "finite ?S" by simp
-  then have "?S \<noteq> {}" by auto
-  then have "Min ?S \<in> ?S"
-    using \<open>finite ?S\<close> by simp
-  then obtain k where "ds k = Min ?S"
-    by force
-  then show ?thesis
-    by (metis Min_le \<open>finite (range ds)\<close> rangeI)
-qed
-
-theorem Valid_inv:
-  fixes inv :: "(('k :: finite) \<Rightarrow> state) \<Rightarrow> real"
+theorem Valid_inv_barrier_s_tr_le_k:
+  fixes inv inv_le :: "(('k :: finite) \<Rightarrow> state) \<Rightarrow> real"
   assumes "\<forall>x. ((\<lambda>v. inv (vec2state_k v)) has_derivative G' x) (at x within UNIV)"
+      and "\<forall>x. ((\<lambda>v. inv_le (vec2state_k v)) has_derivative G_le' x) (at x within UNIV)"
       and "\<forall>ss. ((\<forall>k. b (ss k)) \<longrightarrow> G' (state2vec_k ss) (ODE2Vec_k ode ss) = 0)"
+      and "\<forall>ss. ((\<forall>k. b (ss k)) \<longrightarrow> (inv_le ss = 0 \<longrightarrow> G_le' (state2vec_k ss) (ODE2Vec_k ode ss) < 0))"
       and "\<forall>ss. inv ss = r \<longrightarrow> (\<exists>k. \<not> b (ss k)) \<longrightarrow> (\<forall>k'. \<not> b (ss k'))"
-    shows "\<Turnstile> {(\<lambda>S. (\<forall>es \<in> S. tproj es = [] \<and> b (pproj es)) \<and> 
-               (\<forall>ess. (\<forall>k. ess k \<in> S \<and> lproj (ess k) x = k) \<longrightarrow> inv (ess2ss ess) = r))} 
+    shows "\<Turnstile> {(\<lambda>S. (\<forall>es \<in> S. b (pproj es)) \<and> 
+               (\<forall>ess. (\<forall>k. ess k \<in> S \<and> lproj (ess k) x = k) \<longrightarrow> inv (\<lambda>k. pproj (ess k)) = r 
+                \<and> inv_le (\<lambda>k. pproj (ess k)) \<le> 0 \<and> P (\<lambda>k. tproj (ess k))))} 
               Cont ode b 
               {(\<lambda>S. \<forall>ess. (\<forall>k. ess k \<in> S \<and> lproj (ess k) x = k) \<longrightarrow> 
-               (\<exists>ps d. (\<forall>k. tproj (ess k) = [WaitBlk d (\<lambda>\<tau>. State (ps k \<tau>)) ({}, {})] \<and> 
-               (\<forall>t\<in>{0..d}. inv (\<lambda>k. ps k t) = r))))}"
+               (\<exists>ps d trs. (\<forall>k. tproj (ess k) = (trs k) @ [WaitBlk d (\<lambda>\<tau>. State (ps k \<tau>)) ({}, {})] \<and> 
+               (\<forall>t\<in>{0..d}. inv (\<lambda>k. ps k t) = r \<and> inv_le (\<lambda>k. ps k t) \<le> 0) \<and> P trs)))}"
   unfolding hyper_hoare_triple_def
   apply (intro allI impI)
   subgoal for S ess
   proof-
-    assume a0: "(\<forall>es\<in>S. tproj es = [] \<and> b (pproj es)) \<and> (\<forall>ess. (\<forall>k. ess k \<in> S \<and> lproj (ess k) x = k) \<longrightarrow> inv (ess2ss ess) = r)"
-       and a1: " \<forall>k. ess k \<in> sem (Cont ode b) S \<and> lproj (ess k) x = k"
+    assume a0: "(\<forall>es\<in>S. b (pproj es)) \<and> (\<forall>ess. (\<forall>k. ess k \<in> S \<and> lproj (ess k) x = k) \<longrightarrow> inv (\<lambda>k. pproj (ess k)) = r \<and> inv_le (\<lambda>k. pproj (ess k)) \<le> 0 \<and> P (\<lambda>k. tproj (ess k)))"
+       and a1: "\<forall>k. ess k \<in> sem (Cont ode b) S \<and> lproj (ess k) x = k"
     from a1 have "\<exists>ess' trs. (\<forall>k. ess' k \<in> S \<and> big_step (Cont ode b) (pproj (ess' k)) (trs k) (pproj (ess k)) \<and>
       (lproj (ess' k)) = (lproj (ess k)) \<and> (tproj (ess k)) = (tproj (ess' k)) @ (trs k))"
       using in_sem_k[of ess "Cont ode b" S] by auto
@@ -453,11 +390,11 @@ theorem Valid_inv:
       by auto
     with a1 have b2: "\<forall>k. ess' k \<in> S \<and> lproj (ess' k) x = k"
       by auto
-    with a0 have b3: "inv (ess2ss ess') = r" "\<forall>k. tproj (ess' k) = [] \<and> b (pproj (ess' k))"
+    with a0 have b3: "inv (\<lambda>k. pproj (ess' k)) = r" "inv_le (\<lambda>k. pproj (ess' k)) \<le> 0" "P (\<lambda>k. tproj (ess' k))"
       by blast+
-    with b1 have "\<forall>k. (\<exists>p d. d > 0 \<and> ODEsol ode p d \<and> (\<forall>t. t \<ge> 0 \<and> t < d \<longrightarrow> b (p t)) \<and> 
+    with a0 b1 have "\<forall>k. (\<exists>p d. d > 0 \<and> ODEsol ode p d \<and> (\<forall>t. t \<ge> 0 \<and> t < d \<longrightarrow> b (p t)) \<and> 
     \<not>b (p d) \<and> p 0 = (pproj (ess' k)) \<and> trs k = [WaitBlk d (\<lambda>\<tau>. State (p \<tau>)) ({}, {})])"
-      by (smt (verit, del_insts) contE)
+      by (smt (verit, best) contE)
     then have "\<exists>ps ds. (\<forall>k. ds k > 0 \<and> ODEsol ode (ps k) (ds k) \<and> (\<forall>t. t \<ge> 0 \<and> t < ds k \<longrightarrow> b (ps k t)) \<and> 
     \<not>b (ps k (ds k)) \<and> ps k 0 = (pproj (ess' k)) \<and> trs k = [WaitBlk (ds k) (\<lambda>\<tau>. State (ps k \<tau>)) ({}, {})])"
       by metis
@@ -466,9 +403,86 @@ theorem Valid_inv:
       by auto
     then have "\<exists>k'. \<forall>k. ds k \<ge> ds k'"
       using finite_arg_min[of ds] by blast
-    then obtain k' where "\<forall>k. ds k \<ge> ds k'" by auto
-    have "\<forall>t \<in> {0 .. ds k'}. ((\<lambda>t. inv (\<lambda>k. ps k t)) has_derivative 
-         (\<lambda>s. G' (state2vec_k (\<lambda>k. ps k t)) (s *\<^sub>R ODE2Vec_k ode (\<lambda>k. ps k t)))) (at t within {0 .. ds k'})"
-*)
-    
+    then obtain k' where b5: "\<forall>k. ds k \<ge> ds k'" by auto
+    let ?d = "ds k'"
+    from b4 b5 have b6: "\<forall>k t. t \<ge> 0 \<and> t < ?d \<longrightarrow> b (ps k t)" 
+      using order_less_le_trans by blast
+    from b3 b4 have b7: "inv (\<lambda>k. ps k 0) = r" "inv_le (\<lambda>k. ps k 0) \<le> 0"
+      by presburger+
+    from b4 b5 have b8: "\<forall>k. ODEsol ode (ps k) ?d"
+      by (meson ODEsol_le order_less_le)
+    then have 1: "\<forall>t \<in> {0 .. ?d}. ((\<lambda>t. inv (\<lambda>k. ps k t)) has_derivative 
+         (\<lambda>s. s *\<^sub>R G' (state2vec_k (\<lambda>k. ps k t)) (1 *\<^sub>R ODE2Vec_k ode (\<lambda>k. ps k t)))) (at t within {0 .. ?d})"
+      using inv_chain_k[of inv G' ode ps ?d] assms(1) by auto
+    have 2: "\<forall>t\<in>{0..<?d}. \<forall>s. s *\<^sub>R G' (state2vec_k (\<lambda>k. ps k t)) (1 *\<^sub>R ODE2Vec_k ode (\<lambda>k. ps k t)) = 0"
+      using assms(3) b6 by auto
+    then have 3: "\<forall>t\<in>{0..?d}. inv (\<lambda>k. ps k t) = r"
+      using mvt_real_eq[of ?d "(\<lambda>t. inv (\<lambda>k. ps k t))" "\<lambda>t. (\<lambda>s. s *\<^sub>R G' (state2vec_k (\<lambda>k. ps k t)) (1 *\<^sub>R ODE2Vec_k ode (\<lambda>k. ps k t)))"]
+      using 1 b7 by auto
+    with b4 have "inv (\<lambda>k. ps k ?d) = r"
+      by (meson ODEsol_def atLeastAtMost_iff b4 dual_order.refl)
+    with assms(5) b4 have "\<forall>k. \<not> b (ps k ?d)"
+      by blast
+    with b4 b5 have b9: "\<forall>k. ds k = ?d"
+      by (metis order_less_le)
+    from b8 b9 obtain e where b10: "e > 0 \<and> 
+    (\<forall>k. ((\<lambda>t. state2vec (ps k t)) has_vderiv_on (\<lambda>t. ODE2Vec ode (ps k t))) {-e..?d + e})"
+      using ODEsol_k[of ode ps ?d] by blast
+    then have le_1: "\<forall>t \<in> {-e.. ?d + e}. ((\<lambda>t. inv_le (\<lambda>k. ps k t)) has_derivative 
+    (\<lambda>s. s *\<^sub>R G_le' (state2vec_k (\<lambda>k. ps k t)) (1 *\<^sub>R ODE2Vec_k ode (\<lambda>k. ps k t)))) (at t within {-e..?d + e})"
+      using inv_chain_k'[of inv_le G_le' e ps ode ?d] assms(2) by auto
+    with b6 assms(4) have "\<forall>t\<in>{0..<ds k'}. inv_le (\<lambda>k. ps k t) = 0 \<longrightarrow> 1 *\<^sub>R G_le' (state2vec_k (\<lambda>k. ps k t)) (1 *\<^sub>R ODE2Vec_k ode (\<lambda>k. ps k t)) < 0"
+      by simp
+    then have "\<forall>t\<in>{0..?d}. inv_le (\<lambda>k. ps k t) \<le> 0"
+      using real_inv_le[OF le_1, of 0] b7(2) b10 by force
+    with b1 b4 b3 b9 3 show ?thesis
+      apply (rule_tac x = ps in exI, rule_tac x = ?d in exI, rule_tac x = "\<lambda>k. tproj (ess' k)" in exI)
+      by metis
+  qed
+  done
+
+theorem DC_k:
+  assumes "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. tr = [] \<and> b s}
+               Cont ode b
+               {\<lambda>s tr. ode_inv_assn c tr}"
+      and "\<Turnstile> {P} Cont ode (\<lambda>s. b s \<and> c s) {Q}"
+      and "\<forall>S S'. Q S \<longrightarrow> S' \<subseteq> S \<longrightarrow> Q S'"
+      and "hyper_entails P (\<lambda>S. \<forall>es \<in> S. b (pproj es) \<and> c (pproj es))"
+    shows "\<Turnstile> {P} Cont ode b {Q}"
+  unfolding hyper_hoare_triple_def
+  apply (intro allI impI)
+  subgoal for S
+  proof-
+    assume a0: "P S"
+    with assms(4) have 1: "\<forall>es \<in> S. b (pproj es) \<and> c (pproj es)"
+      using  hyper_entailsE by fastforce
+    from a0 assms(2) have 2: "Q (sem (Cont ode (\<lambda>s. b s \<and> c s)) S)"
+      by (simp add: hyper_hoare_triple_def)
+    have 3: "sem (Cont ode b) S \<subseteq> sem (Cont ode (\<lambda>s. b s \<and> c s)) S" (is "?A \<subseteq> ?B")
+    proof
+      fix \<phi> assume "\<phi> \<in> ?A"
+      then obtain \<sigma>\<^sub>p tr0 l where b0: "(fst \<phi>, \<sigma>\<^sub>p, tr0) \<in> S" "big_step (Cont ode b) \<sigma>\<^sub>p l (fst (snd \<phi>))" 
+      "snd (snd \<phi>) = tr0 @ l"
+        using in_sem by blast
+      with b0(2) 1 obtain p d where b1: "l = [WaitBlk (ereal d) (\<lambda>\<tau>. State (p \<tau>)) ({}, {})]" 
+      "(fst (snd \<phi>)) = p d" "0 < d" "ODEsol ode p d" "\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (p t)" "\<not> b (p d)" "p 0 = \<sigma>\<^sub>p"
+        using contE[of ode b \<sigma>\<^sub>p l "(fst (snd \<phi>))"] by (metis pproj_def split_pairs)
+      with assms(1) b0(2) have "ode_inv_assn c l"
+        using Valid_def by auto
+      with b1 have "\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (p t) \<and> c (p t)"
+        using ode_inv_assn_implie[of c d p] by auto
+      with b1 have "big_step (Cont ode (\<lambda>s. b s \<and> c s)) \<sigma>\<^sub>p l (fst (snd \<phi>))"
+        using ContB2[of d ode p "(\<lambda>s. b s \<and> c s)" \<sigma>\<^sub>p] by auto
+      then show "\<phi> \<in> ?B"
+        using b0(1) b0(3) in_sem by blast
+    qed
+    with assms(3) 2 show ?thesis by auto
+  qed
+  done
+
+
+          
+
+
+
 end

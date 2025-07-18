@@ -6,38 +6,38 @@ subsection \<open>Hyper assertions\<close>
 
 type_synonym 'a hyperassertion = "('a set \<Rightarrow> bool)"
 
-definition entails where
-  "entails A B \<longleftrightarrow> (\<forall>S. A S \<longrightarrow> B S)"
+definition hyper_entails where
+  "hyper_entails A B \<longleftrightarrow> (\<forall>S. A S \<longrightarrow> B S)"
 
-lemma entails_refl:
-  "entails A A"
-  by (simp add: entails_def)
+lemma hyper_entails_refl:
+  "hyper_entails A A"
+  by (simp add: hyper_entails_def)
 
-lemma entailsI:
+lemma hyper_entailsI:
   assumes "\<And>S. A S \<Longrightarrow> B S"
-  shows "entails A B"
-  by (simp add: assms entails_def)
+  shows "hyper_entails A B"
+  by (simp add: assms hyper_entails_def)
 
-lemma entailsE:
-  assumes "entails A B"
+lemma hyper_entailsE:
+  assumes "hyper_entails A B"
       and "A x"
     shows "B x"
-  by (meson assms(1) assms(2) entails_def)
+  by (meson assms(1) assms(2) hyper_entails_def)
 
-lemma bientails_equal:
-  assumes "entails A B"
-      and "entails B A"
+lemma bihyper_entails_equal:
+  assumes "hyper_entails A B"
+      and "hyper_entails B A"
     shows "A = B"
 proof (rule ext)
   fix S show "A S = B S"
-    by (meson assms(1) assms(2) entailsE)
+    by (meson assms(1) assms(2) hyper_entailsE)
 qed
 
-lemma entails_trans:
-  assumes "entails A B"
-      and "entails B C"
-    shows "entails A C"
-  by (metis assms(1) assms(2) entails_def)
+lemma hyper_entails_trans:
+  assumes "hyper_entails A B"
+      and "hyper_entails B C"
+    shows "hyper_entails A C"
+  by (metis assms(1) assms(2) hyper_entails_def)
 
 definition setify_prop where
   "setify_prop b = {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. b \<sigma>\<^sub>p}"
@@ -97,13 +97,13 @@ definition conj where
   "conj P Q S \<longleftrightarrow> P S \<and> Q S"
 
 lemma entail_conj:
-  assumes "entails A B"
-  shows "entails A (conj A B)"
-  by (metis (full_types) assms conj_def entails_def)
+  assumes "hyper_entails A B"
+  shows "hyper_entails A (conj A B)"
+  by (metis (full_types) assms conj_def hyper_entails_def)
 
 lemma entail_conj_weaken:
-  "entails (conj A B) A"
-  by (simp add: conj_def entails_def)
+  "hyper_entails (conj A B) A"
+  by (simp add: conj_def hyper_entails_def)
 
 definition disj where
   "disj P Q S \<longleftrightarrow> P S \<or> Q S"
@@ -115,20 +115,20 @@ definition forall :: "('c \<Rightarrow> 'a hyperassertion) \<Rightarrow> 'a hype
   "forall P S \<longleftrightarrow> (\<forall>x. P x S)"
 
 lemma over_inter:
-  "entails (over_approx (P \<inter> Q)) (conj (over_approx P) (over_approx Q))"
-  by (simp add: conj_def entails_def over_approx_def)
+  "hyper_entails (over_approx (P \<inter> Q)) (conj (over_approx P) (over_approx Q))"
+  by (simp add: conj_def hyper_entails_def over_approx_def)
 
 lemma over_union:
-  "entails (disj (over_approx P) (over_approx Q)) (over_approx (P \<union> Q))"
-  by (metis disj_def entailsI le_supI1 le_supI2 over_approx_def)
+  "hyper_entails (disj (over_approx P) (over_approx Q)) (over_approx (P \<union> Q))"
+  by (metis disj_def hyper_entailsI le_supI1 le_supI2 over_approx_def)
 
 lemma under_union:
-  "entails (under_approx (P \<union> Q)) (disj (under_approx P) (under_approx Q))"
-  by (simp add: disj_def entails_def under_approx_def)
+  "hyper_entails (under_approx (P \<union> Q)) (disj (under_approx P) (under_approx Q))"
+  by (simp add: disj_def hyper_entails_def under_approx_def)
 
 lemma under_inter:
-  "entails (conj (under_approx P) (under_approx Q)) (under_approx (P \<inter> Q))"
-  by (simp add: conj_def entails_def le_infI1 under_approx_def)
+  "hyper_entails (conj (under_approx P) (under_approx Q)) (under_approx (P \<inter> Q))"
+  by (simp add: conj_def hyper_entails_def le_infI1 under_approx_def)
 
 text \<open>Operator \<open>\<otimes>\<close>\<close>
 definition join :: "'a hyperassertion \<Rightarrow> 'a hyperassertion \<Rightarrow> 'a hyperassertion" where
@@ -158,16 +158,16 @@ proof
     by (metis assms closed_by_union_def join_def sup_idem)
 qed
 
-lemma entails_join_entails:
-  assumes "entails A1 B1"
-      and "entails A2 B2"
-    shows "entails (join A1 A2) (join B1 B2)"
-proof (rule entailsI)
+lemma hyper_entails_join_hyper_entails:
+  assumes "hyper_entails A1 B1"
+      and "hyper_entails A2 B2"
+    shows "hyper_entails (join A1 A2) (join B1 B2)"
+proof (rule hyper_entailsI)
   fix S assume "join A1 A2 S"
   then obtain S1 S2 where "A1 S1" "A2 S2" "S = S1 \<union> S2"
     by (metis join_def)
   then show "join B1 B2 S"
-    by (metis assms(1) assms(2) entailsE join_def)
+    by (metis assms(1) assms(2) hyper_entailsE join_def)
 qed
 
 text \<open>Operator \<open>\<Otimes>\<close> (for \<open>x \<in> X\<close>)\<close>
@@ -211,11 +211,11 @@ lemma hyper_hoare_tripleE:
   by metis
 
 lemma consequence_rule:
-  assumes "entails P P'"
-      and "entails Q' Q"
+  assumes "hyper_entails P P'"
+      and "hyper_entails Q' Q"
       and "\<Turnstile> {P'} C {Q'}"
     shows "\<Turnstile> {P} C {Q}"
-  by (metis (no_types, opaque_lifting) assms(1) assms(2) assms(3) entails_def hyper_hoare_triple_def)
+  by (metis (no_types, opaque_lifting) assms(1) assms(2) assms(3) hyper_entails_def hyper_hoare_triple_def)
 
 lemma skip_rule:
   "\<Turnstile> {P} Skip {P}"
@@ -391,7 +391,7 @@ qed
 inductive hoare :: "('lvar, 'lval) hyper_assn \<Rightarrow> proc \<Rightarrow> ('lvar, 'lval) hyper_assn \<Rightarrow> bool" ("\<turnstile> ({(1_)}/ (_)/ {(1_)})" 50) 
   and interrupt_hoare :: "('lvar, 'lval) hyper_assn \<Rightarrow> nat \<Rightarrow> ODE \<Rightarrow> fform \<Rightarrow> (comm \<times> proc) list \<Rightarrow> ('lvar, 'lval) hyper_assn \<Rightarrow> bool" where
   SkipH: "\<turnstile> {P} Skip {P}"                                               
-| ConsH: "\<lbrakk>entails P P'; entails Q' Q; \<turnstile> {P'} C {Q'}\<rbrakk> \<Longrightarrow> \<turnstile> {P} C {Q}" 
+| ConsH: "\<lbrakk>hyper_entails P P'; hyper_entails Q' Q; \<turnstile> {P'} C {Q'}\<rbrakk> \<Longrightarrow> \<turnstile> {P} C {Q}" 
 | AssignH: "\<turnstile> {(\<lambda>S. P {(\<sigma>\<^sub>l, \<sigma>\<^sub>p(x := e \<sigma>\<^sub>p), l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S })} (Assign x e) {P}" 
 | HavocH: "\<turnstile> {(\<lambda>S. P {(\<sigma>\<^sub>l, \<sigma>\<^sub>p(x := v), l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S})} (Havoc x) {P}"   
 | SeqH: "\<lbrakk> \<turnstile> {P} C1 {R}; \<turnstile> {R} C2 {Q} \<rbrakk> \<Longrightarrow> \<turnstile> {P} C1; C2 {Q}"
@@ -421,7 +421,7 @@ inductive hoare :: "('lvar, 'lval) hyper_assn \<Rightarrow> proc \<Rightarrow> (
   \<union> {(\<sigma>\<^sub>l, (sl d)(var := v), l @ [WaitBlk d (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), InBlock ch v]) 
   |\<sigma>\<^sub>l \<sigma>\<^sub>p l d sl v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S0 \<and> d > 0 \<and> ODEsol ode sl d \<and> sl 0 = \<sigma>\<^sub>p \<and> (\<forall>t. t \<ge> 0 \<and> t < d \<longrightarrow> b (sl t))})} C {Q};
   cs ! n = (ch[?]var, C); interrupt_hoare P n ode b cs R\<rbrakk> \<Longrightarrow> interrupt_hoare P (Suc n) ode b cs (join R Q)"
-| InterruptH4: "\<lbrakk>entails P P'; entails Q' Q;interrupt_hoare P' n ode b cs Q'\<rbrakk> \<Longrightarrow> 
+| InterruptH4: "\<lbrakk>hyper_entails P P'; hyper_entails Q' Q;interrupt_hoare P' n ode b cs Q'\<rbrakk> \<Longrightarrow> 
                 interrupt_hoare P n ode b cs Q"
 | InterruptH5: "interrupt_hoare P (length cs) ode b cs Q \<Longrightarrow> \<turnstile> {P} Interrupt ode b cs {Q}"
 | InterruptH6: "\<lbrakk>\<And>x::('lvar, 'lval) exstate set. interrupt_hoare (P x) n ode b cs (Q x)\<rbrakk> \<Longrightarrow> 
@@ -1234,7 +1234,7 @@ next
 next
   case (InterruptH4 P P' Q' Q cs ode b n)
   then show ?case
-    by (simp add: entailsE interrupt_Valid_def)
+    by (simp add: hyper_entailsE interrupt_Valid_def)
 next
   case (InterruptH5 P cs ode b Q)
   then show ?case
@@ -1266,8 +1266,8 @@ lemma completeE:
 
 lemma complete_ichoice_aux:
   assumes "hyper_hoare_triple A (IChoice C1 C2) B"
-  shows "entails (\<lambda>S'. \<exists>S. A S \<and> S' = sem C1 S \<union> sem C2 S) B"
-proof (rule entailsI)
+  shows "hyper_entails (\<lambda>S'. \<exists>S. A S \<and> S' = sem C1 S \<union> sem C2 S) B"
+proof (rule hyper_entailsI)
   fix S' assume "\<exists>S. A S \<and> S' = sem C1 S \<union> sem C2 S"
   then show "B S'"
     by (metis assms hyper_hoare_tripleE sem_if)
@@ -1293,10 +1293,10 @@ proof (rule completeI)
           by (simp add: assms(2) completeE hyper_hoare_triple_def)
       qed
     qed
-    show "entails P (exists (\<lambda>V S. P S \<and> S = V))"
-      by (simp add: entailsI exists_def)
-    show "entails (exists (\<lambda>V. join (\<lambda>S. S = sem C1 V \<and> P V) (\<lambda>S. S = sem C2 V))) Q"
-    proof (rule entailsI)
+    show "hyper_entails P (exists (\<lambda>V S. P S \<and> S = V))"
+      by (simp add: hyper_entailsI exists_def)
+    show "hyper_entails (exists (\<lambda>V. join (\<lambda>S. S = sem C1 V \<and> P V) (\<lambda>S. S = sem C2 V))) Q"
+    proof (rule hyper_entailsI)
       fix S assume "exists (\<lambda>V. join (\<lambda>S. S = sem C1 V \<and> P V) (\<lambda>S. S = sem C2 V)) S"
       then obtain V where "join (\<lambda>S. S = sem C1 V \<and> P V) (\<lambda>S. S = sem C2 V) S"
         by (meson exists_def)
@@ -1340,17 +1340,17 @@ proof (rule completeI)
   proof (rule ConsH)
     show "\<turnstile> {(\<lambda>S. Q (Set.filter (b \<circ> fst \<circ> snd) S))} (Assume b) {Q}"
       by (simp add: AssumeH)
-    show "entails P (\<lambda>S. Q (Set.filter (b \<circ> fst \<circ> snd) S))"
-      by (metis (mono_tags, lifting) asm0 assume_sem entails_def hyper_hoare_tripleE)
-    show "entails Q Q"      
-      by (simp add: entailsI)
+    show "hyper_entails P (\<lambda>S. Q (Set.filter (b \<circ> fst \<circ> snd) S))"
+      by (metis (mono_tags, lifting) asm0 assume_sem hyper_entails_def hyper_hoare_tripleE)
+    show "hyper_entails Q Q"      
+      by (simp add: hyper_entailsI)
   qed
 qed
 
 lemma complete_skip:
   "complete P Skip Q"
   using completeI SkipH
-  by (metis (mono_tags, lifting) entails_def hyper_hoare_triple_def sem_skip ConsH)
+  by (metis (mono_tags, lifting) hyper_entails_def hyper_hoare_triple_def sem_skip ConsH)
 
 lemma complete_assign:
   "complete P (Assign x e) Q"
@@ -1360,14 +1360,14 @@ proof (rule completeI)
   proof (rule ConsH)
     show "\<turnstile> {\<lambda>S. Q {(\<sigma>\<^sub>l, \<sigma>\<^sub>p(x := e \<sigma>\<^sub>p), l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}} Assign x e {Q}"
       by (simp add: AssignH)
-    show "entails P (\<lambda>S. Q {(\<sigma>\<^sub>l, \<sigma>\<^sub>p(x := e \<sigma>\<^sub>p), l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S})"
-    proof (rule entailsI)
+    show "hyper_entails P (\<lambda>S. Q {(\<sigma>\<^sub>l, \<sigma>\<^sub>p(x := e \<sigma>\<^sub>p), l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S})"
+    proof (rule hyper_entailsI)
       fix S assume "P S"
       then show "Q {(\<sigma>\<^sub>l, \<sigma>\<^sub>p(x := e \<sigma>\<^sub>p), l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}"
         by (metis asm0 hyper_hoare_triple_def sem_assign)
     qed
-    show "entails Q Q"
-      by (simp add: entailsI)
+    show "hyper_entails Q Q"
+      by (simp add: hyper_entailsI)
   qed
 qed
 
@@ -1379,14 +1379,14 @@ proof (rule completeI)
   proof (rule ConsH)
     show "\<turnstile> {\<lambda>S. Q {(\<sigma>\<^sub>l, \<sigma>\<^sub>p(x := v), l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}} Havoc x {Q}"
       using HavocH by fast
-    show "entails P (\<lambda>S. Q {(\<sigma>\<^sub>l, \<sigma>\<^sub>p(x := v), l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S})"
-    proof (rule entailsI)
+    show "hyper_entails P (\<lambda>S. Q {(\<sigma>\<^sub>l, \<sigma>\<^sub>p(x := v), l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S})"
+    proof (rule hyper_entailsI)
       fix S assume "P S"
       then show "Q {(\<sigma>\<^sub>l, \<sigma>\<^sub>p(x := v), l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}"
         by (metis asm0 hyper_hoare_triple_def sem_havoc)
     qed
-    show "entails Q Q"
-      by (simp add: entailsI)
+    show "hyper_entails Q Q"
+      by (simp add: hyper_entailsI)
   qed
 qed
 
@@ -1403,8 +1403,8 @@ by (induct n arbitrary: S') (auto)
 
 lemma complete_while_aux:
   assumes "hyper_hoare_triple (\<lambda>S. P S \<and> S = V) (Rep C) Q"
-  shows "entails (natural_partition (construct_inv (\<lambda>S. P S \<and> S = V) C)) Q"
-proof (rule entailsI)
+  shows "hyper_entails (natural_partition (construct_inv (\<lambda>S. P S \<and> S = V) C)) Q"
+proof (rule hyper_entailsI)
   fix S assume "natural_partition (construct_inv (\<lambda>S. P S \<and> S = V) C) S"
 
   then obtain F where asm0: "S = (\<Union>n. F n)" "\<And>n. construct_inv (\<lambda>S. P S \<and> S = V) C n (F n)"
@@ -1445,21 +1445,21 @@ proof (rule completeI)
   proof (rule ConsH)
     show "hoare (exists (\<lambda>V. ?I V 0)) (Rep C) (exists (\<lambda>V. ((natural_partition (?I V)))))"
       using r by (rule ExistsH)
-    show "entails P (exists (\<lambda>V. construct_inv (\<lambda>S. P S \<and> S = V) C 0))"
-      by (simp add: entailsI exists_def)
-    show "entails (exists (\<lambda>V. natural_partition (construct_inv (\<lambda>S. P S \<and> S = V) C))) Q"
-    proof (rule entailsI)
+    show "hyper_entails P (exists (\<lambda>V. construct_inv (\<lambda>S. P S \<and> S = V) C 0))"
+      by (simp add: hyper_entailsI exists_def)
+    show "hyper_entails (exists (\<lambda>V. natural_partition (construct_inv (\<lambda>S. P S \<and> S = V) C))) Q"
+    proof (rule hyper_entailsI)
       fix S' assume "exists (\<lambda>V. natural_partition (construct_inv (\<lambda>S. P S \<and> S = V) C)) S'"
       then obtain V where "natural_partition (construct_inv (\<lambda>S. P S \<and> S = V) C) S'"
         by (meson exists_def)
-      moreover have "entails (natural_partition (construct_inv (\<lambda>S. P S \<and> S = V) C)) Q"
+      moreover have "hyper_entails (natural_partition (construct_inv (\<lambda>S. P S \<and> S = V) C)) Q"
       proof (rule complete_while_aux)
         show "hyper_hoare_triple (\<lambda>S. P S \<and> S = V) (Rep C) Q"
           using asm0 hyper_hoare_triple_def[of "\<lambda>S. P S \<and> S = V"]
           hyper_hoare_triple_def[of P "Rep C" Q] by auto
       qed
       ultimately show "Q S'"
-        by (simp add: entails_def)
+        by (simp add: hyper_entails_def)
     qed
   qed
 qed
@@ -1474,18 +1474,18 @@ proof(rule completeI)
     l @ [WaitBlk d (\<lambda>_. State \<sigma>\<^sub>p) ({ch}, {}), OutBlock ch (e \<sigma>\<^sub>p)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d. (d::real) > 0 \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
     {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk \<infinity> (\<lambda>_. State \<sigma>\<^sub>p) ({ch}, {})]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}))} (Cm (ch[!]e)) {Q}"
       using SendH by blast
-    show "entails P (\<lambda>S. Q ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [OutBlock ch (e \<sigma>\<^sub>p)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
+    show "hyper_entails P (\<lambda>S. Q ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [OutBlock ch (e \<sigma>\<^sub>p)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
     {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk (ereal d) (\<lambda>_. State \<sigma>\<^sub>p) ({ch}, {}), OutBlock ch (e \<sigma>\<^sub>p)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d. 0 < d 
     \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union> {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk \<infinity> (\<lambda>_. State \<sigma>\<^sub>p) ({ch}, {})]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}))"
-    proof (rule entailsI)
+    proof (rule hyper_entailsI)
       fix S assume "P S"
       then show "Q ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [OutBlock ch (e \<sigma>\<^sub>p)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>  {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, 
       l @ [WaitBlk (ereal d) (\<lambda>_. State \<sigma>\<^sub>p) ({ch}, {}), OutBlock ch (e \<sigma>\<^sub>p)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d. 0 < d \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
       {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk \<infinity> (\<lambda>_. State \<sigma>\<^sub>p) ({ch}, {})]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S})"
         by (metis assm0 hyper_hoare_triple_def sem_send)
     qed
-    show "entails Q Q"
-      by (simp add: entailsI)
+    show "hyper_entails Q Q"
+      by (simp add: hyper_entailsI)
   qed
 qed
 
@@ -1500,11 +1500,11 @@ proof(rule completeI)
   \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union> {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk \<infinity> (\<lambda>_. State \<sigma>\<^sub>p) ({}, {ch})]) 
   |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}))} (Cm (ch[?]var)) {Q}"
       using RecvH by blast
-    show "entails P (\<lambda>S. Q ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p(var := v), l @ [InBlock ch v]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
+    show "hyper_entails P (\<lambda>S. Q ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p(var := v), l @ [InBlock ch v]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
     {(\<sigma>\<^sub>l, \<sigma>\<^sub>p(var := v), l @ [WaitBlk (ereal d) (\<lambda>_. State \<sigma>\<^sub>p) ({}, {ch}), InBlock ch v]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d v.
     0 < d \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union> {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk \<infinity> (\<lambda>_. State \<sigma>\<^sub>p) ({}, {ch})]) 
     |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}))"
-    proof (rule entailsI)
+    proof (rule hyper_entailsI)
       fix S assume "P S"
       then show "Q ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p(var := v), l @ [InBlock ch v]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
       {(\<sigma>\<^sub>l, \<sigma>\<^sub>p(var := v), l @ [WaitBlk (ereal d) (\<lambda>_. State \<sigma>\<^sub>p) ({}, {ch}), InBlock ch v]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d v.
@@ -1512,8 +1512,8 @@ proof(rule completeI)
       |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S})"
         by (metis assm0 hyper_hoare_triple_def sem_recv)
     qed
-    show "entails Q Q"
-      by (simp add: entailsI)
+    show "hyper_entails Q Q"
+      by (simp add: hyper_entailsI)
   qed
 qed
 
@@ -1527,28 +1527,28 @@ proof(rule completeI)
     l @ [WaitBlk d (\<lambda>\<tau>. State (p \<tau>)) ({}, {})]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l p d. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S \<and> d > 0 \<and> 
     ODEsol ode p d \<and> (\<forall>t. t \<ge> 0 \<and> t < d \<longrightarrow> b (p t)) \<and> \<not>b (p d) \<and> p 0 = \<sigma>\<^sub>p}))} (Cont ode b) {Q}"
       using ContH by blast
-    show "entails P (\<lambda>S. Q ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S \<and> \<not> b \<sigma>\<^sub>p} \<union> {(\<sigma>\<^sub>l, p d, 
+    show "hyper_entails P (\<lambda>S. Q ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S \<and> \<not> b \<sigma>\<^sub>p} \<union> {(\<sigma>\<^sub>l, p d, 
     l @ [WaitBlk d (\<lambda>\<tau>. State (p \<tau>)) ({}, {})]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l p d. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S \<and> d > 0 \<and> 
     ODEsol ode p d \<and> (\<forall>t. t \<ge> 0 \<and> t < d \<longrightarrow> b (p t)) \<and> \<not>b (p d) \<and> p 0 = \<sigma>\<^sub>p}))"
-    proof (rule entailsI)
+    proof (rule hyper_entailsI)
       fix S assume "P S"
       then show "Q ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S \<and> \<not> b \<sigma>\<^sub>p} \<union> {(\<sigma>\<^sub>l, p d, 
       l @ [WaitBlk d (\<lambda>\<tau>. State (p \<tau>)) ({}, {})]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l p d. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S \<and> d > 0 \<and> 
       ODEsol ode p d \<and> (\<forall>t. t \<ge> 0 \<and> t < d \<longrightarrow> b (p t)) \<and> \<not>b (p d) \<and> p 0 = \<sigma>\<^sub>p})"
         by (metis assm0 hyper_hoare_triple_def sem_ode)
     qed
-    show "entails Q Q"
-      by (simp add: entailsI)
+    show "hyper_entails Q Q"
+      by (simp add: hyper_entailsI)
   qed
 qed
 
 lemma rule_complete_int_Nil:
   assumes "\<Turnstile> {P} Interrupt ode b [] {Q}"
-  shows "entails (\<lambda>S. \<exists>S0. P S0 \<and> S = {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S0 \<and> \<not> b \<sigma>\<^sub>p} \<union>
+  shows "hyper_entails (\<lambda>S. \<exists>S0. P S0 \<and> S = {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S0 \<and> \<not> b \<sigma>\<^sub>p} \<union>
   {(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l @ [WaitBlk d (\<lambda> \<tau>. State (sl \<tau>)) (rdy_of_echoice [])]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d sl \<sigma>\<^sub>p'. 
   (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S0 \<and> d > 0 \<and> ODEsol ode sl d \<and> (\<forall>t. t \<ge> 0 \<and> t < d \<longrightarrow> b (sl t)) \<and> \<not> b (sl d) 
   \<and> sl 0 = \<sigma>\<^sub>p \<and> sl d = \<sigma>\<^sub>p'}) Q" 
-proof(rule entailsI)
+proof(rule hyper_entailsI)
   fix S
   assume "\<exists>S0. P S0 \<and> S = {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S0 \<and> \<not> b \<sigma>\<^sub>p}
   \<union> {(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l @ [WaitBlk d (\<lambda> \<tau>. State (sl \<tau>)) (rdy_of_echoice [])]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d sl \<sigma>\<^sub>p'. 
@@ -1589,8 +1589,8 @@ proof(induct n arbitrary: P Q)
   proof(rule InterruptH4)
     show "interrupt_hoare ?P 0 ode b cs Q"
       using InterruptH1 by blast
-    show "entails P ?P"
-    proof(rule entailsI)
+    show "hyper_entails P ?P"
+    proof(rule hyper_entailsI)
       fix S
       assume "P S"
       then show "Q ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S \<and> \<not> b \<sigma>\<^sub>p} \<union> 
@@ -1599,8 +1599,8 @@ proof(induct n arbitrary: P Q)
       \<and> sl 0 = \<sigma>\<^sub>p \<and> sl d = \<sigma>\<^sub>p'})"
         by (metis "0.prems"(1) int_comm_trace_0 int_no_comm_trace_def sup_bot.right_neutral)
     qed
-    show "entails Q Q"
-      by (simp add: entails_refl)
+    show "hyper_entails Q Q"
+      by (simp add: hyper_entails_refl)
   qed
 next
   case (Suc n)
@@ -1637,11 +1637,11 @@ next
         qed
       qed
     next
-      show "entails P (exists (\<lambda>V S. P S \<and> S = V))"
-        by (simp add: entails_def exists_def)
-      show "entails (exists (\<lambda>V. join (\<lambda>S. S = int_no_comm_trace ode b cs V \<union> int_comm_trace n ode b cs V \<and> P V) 
+      show "hyper_entails P (exists (\<lambda>V S. P S \<and> S = V))"
+        by (simp add: hyper_entails_def exists_def)
+      show "hyper_entails (exists (\<lambda>V. join (\<lambda>S. S = int_no_comm_trace ode b cs V \<union> int_comm_trace n ode b cs V \<and> P V) 
             (\<lambda>S. S = int_send_trace ode b cs C ch e V \<and> P V))) Q"
-      proof(rule entailsI)
+      proof(rule hyper_entailsI)
         fix S
         assume "exists (\<lambda>V. join (\<lambda>S. S = int_no_comm_trace ode b cs V \<union> int_comm_trace n ode b cs V \<and> P V) 
                 (\<lambda>S. S = int_send_trace ode b cs C ch e V \<and> P V)) S"
@@ -1683,11 +1683,11 @@ next
         qed
       qed
     next
-      show "entails P (exists (\<lambda>V S. P S \<and> S = V))"
-        by (simp add: entails_def exists_def)
-      show "entails (exists (\<lambda>V. join (\<lambda>S. S = int_no_comm_trace ode b cs V \<union> int_comm_trace n ode b cs V \<and> P V) 
+      show "hyper_entails P (exists (\<lambda>V S. P S \<and> S = V))"
+        by (simp add: hyper_entails_def exists_def)
+      show "hyper_entails (exists (\<lambda>V. join (\<lambda>S. S = int_no_comm_trace ode b cs V \<union> int_comm_trace n ode b cs V \<and> P V) 
             (\<lambda>S. S = int_recv_trace ode b cs C ch var V \<and> P V))) Q"
-      proof(rule entailsI)
+      proof(rule hyper_entailsI)
         fix S
         assume "exists (\<lambda>V. join (\<lambda>S. S = int_no_comm_trace ode b cs V \<union> int_comm_trace n ode b cs V \<and> P V) 
                 (\<lambda>S. S = int_recv_trace ode b cs C ch var V \<and> P V)) S"
@@ -2000,11 +2000,11 @@ lemma par_hyper_hoare_tripleE:
   by metis
 
 lemma par_consequence_rule:
-  assumes "entails P P'"
-      and "entails Q' Q"
+  assumes "hyper_entails P P'"
+      and "hyper_entails Q' Q"
       and "\<Turnstile>\<^sub>P {P'} C {Q'}"
     shows "\<Turnstile>\<^sub>P {P} C {Q}"
-  by (metis (no_types, opaque_lifting) assms(1) assms(2) assms(3) entails_def par_hyper_hoare_triple_def)
+  by (metis (no_types, opaque_lifting) assms(1) assms(2) assms(3) hyper_entails_def par_hyper_hoare_triple_def)
 
 lemma rule_par_single:
   assumes "\<Turnstile> {emp_trace_hyper_assn P} C {Q}"
@@ -2048,7 +2048,7 @@ qed
 inductive par_hoare :: "('lvar, 'lval) gs_hyper_assn \<Rightarrow> pproc \<Rightarrow> ('lvar, 'lval)ghyper_assn \<Rightarrow> bool" ("\<turnstile>\<^sub>p ({(1_)}/ (_)/ {(1_)})" 50) where
   Single: "\<turnstile> {emp_trace_hyper_assn P} C {Q} \<Longrightarrow> \<turnstile>\<^sub>p {sing_hyper_assn P} (Single C) {sing_ghyper_assn Q}"
 | Par: "\<turnstile>\<^sub>p {P1} C1 {Q1} \<Longrightarrow> \<turnstile>\<^sub>p {P2} C2 {Q2} \<Longrightarrow>  \<turnstile>\<^sub>p {par_hyper_assn P1 P2} (Parallel C1 chs C2) {sync_ghyper_assn chs Q1 Q2}"
-| Cons: "\<lbrakk>entails P P'; entails Q' Q; \<turnstile>\<^sub>p {P'} C {Q'}\<rbrakk> \<Longrightarrow> \<turnstile>\<^sub>p {P} C {Q}"
+| Cons: "\<lbrakk>hyper_entails P P'; hyper_entails Q' Q; \<turnstile>\<^sub>p {P'} C {Q'}\<rbrakk> \<Longrightarrow> \<turnstile>\<^sub>p {P} C {Q}"
 
 theorem par_hoare_sound:
   "\<turnstile>\<^sub>p {P} C {Q} \<Longrightarrow> \<Turnstile>\<^sub>P {P} C {Q}"
@@ -2086,10 +2086,10 @@ proof(rule Cons)
     then show "\<turnstile> {emp_trace_hyper_assn P} C {\<lambda>S'. \<exists>S. emp_trace_hyper_assn P S \<and> S' = sem C S}"
       by (simp add: completeness)
   qed
-  show "entails (sing_hyper_assn P) (sing_hyper_assn P)"
-    using entails_refl by blast
-  show "entails (sing_ghyper_assn (\<lambda>S'. \<exists>S. emp_trace_hyper_assn P S \<and> S' = sem C S)) Q"
-  proof(rule entailsI)
+  show "hyper_entails (sing_hyper_assn P) (sing_hyper_assn P)"
+    using hyper_entails_refl by blast
+  show "hyper_entails (sing_ghyper_assn (\<lambda>S'. \<exists>S. emp_trace_hyper_assn P S \<and> S' = sem C S)) Q"
+  proof(rule hyper_entailsI)
     fix S
     assume "sing_ghyper_assn (\<lambda>S'. \<exists>S. emp_trace_hyper_assn P S \<and> S' = sem C S) S"
     then obtain S' S'' where a0: "P S'" "S'' = {(\<sigma>\<^sub>p, \<sigma>\<^sub>l, []) |\<sigma>\<^sub>p \<sigma>\<^sub>l. (\<sigma>\<^sub>p, \<sigma>\<^sub>l) \<in> S'}"
@@ -2125,10 +2125,10 @@ next
       by blast+
     then show "\<turnstile>\<^sub>p {par_hyper_assn P1 P2} Parallel C1 chs C2 {sync_ghyper_assn chs ?Q1 ?Q2}"
       by (simp add: Par)
-    from asm0(1) show "entails P (par_hyper_assn P1 P2)"
-      using entails_refl by blast
-    show "entails (sync_ghyper_assn chs ?Q1 ?Q2) Q"
-    proof(rule entailsI)
+    from asm0(1) show "hyper_entails P (par_hyper_assn P1 P2)"
+      using hyper_entails_refl by blast
+    show "hyper_entails (sync_ghyper_assn chs ?Q1 ?Q2) Q"
+    proof(rule hyper_entailsI)
       fix S
       assume "sync_ghyper_assn chs ?Q1 ?Q2 S"
       then obtain S1 S2 where asm1: "P1 S1" "P2 S2" "S = {(ExParState s1 s2, l) |s1 s2 l1 l2 l. 

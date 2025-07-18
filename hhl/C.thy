@@ -135,7 +135,7 @@ lemma Plant_block_snoc:
   by (auto simp add: join_assoc)
 
 lemma Plant_prop:
-  "\<Turnstile>
+  "\<Turnstile>\<^sub>H\<^sub>L
     {\<lambda>s tr. s = (\<lambda>_. 0)(V := v0, S := s0, A := a00) \<and> emp\<^sub>t tr}
       Plant
     {\<lambda>s tr. \<exists>a0 xs. s = Plant_end_state (v0, s0, a0) xs \<and>
@@ -325,7 +325,7 @@ lemma Control_inv_snoc:
   done
 
 lemma Control_prop:
-  "\<Turnstile>
+  "\<Turnstile>\<^sub>H\<^sub>L
     {\<lambda>s tr. s = ((\<lambda>_. 0)(V := v0, S := s0, Command_a := a0)) \<and> emp\<^sub>t tr}
       Control
     {\<lambda>s tr. \<exists>v' s' xs. s = Control_end_state (v', s', com_a s' v') xs 
@@ -785,7 +785,7 @@ definition System :: pproc where
 
 lemma System_Prop:
   assumes "loop_invariant (s0, v0)"
-  shows "\<Turnstile>\<^sub>p
+  shows "\<Turnstile>\<^sub>H\<^sub>L\<^sub>p
     {pair_assn (\<lambda>s. s = ((\<lambda>_. 0)(V := v0, S := s0, A := a00)))
                (\<lambda>s. s = ((\<lambda>_. 0)(V := v00', S := s00', Command_a := a00')))}
       System

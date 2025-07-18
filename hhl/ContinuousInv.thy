@@ -74,10 +74,6 @@ theorem Valid_inv:
 
 
 text \<open>ODE with invariant\<close>
-inductive ode_inv_assn :: "(state \<Rightarrow> bool) \<Rightarrow> tassn" where
-  "\<forall>t\<in>{0..d::real}. f (p t) \<Longrightarrow> ode_inv_assn f [WaitBlk d (\<lambda>\<tau>. State (p \<tau>)) ({}, {})]"
-
-inductive_cases ode_inv_assn_elim: "ode_inv_assn f tr"
 
 theorem Valid_inv':
   fixes inv :: "state \<Rightarrow> real"
@@ -144,8 +140,6 @@ theorem Valid_ode_supp:
    qed
    done
   done
-
-
 
 theorem Valid_inv_barrier_s_tr_le:
   fixes inv :: "state \<Rightarrow> real"

@@ -72,7 +72,7 @@ lemma P0_inv_Suc:
   apply (induct n) by (auto simp add: join_assoc)
 
 lemma ContODE:
- "\<Turnstile> {\<lambda>s tr. landerInv s \<le> 0 \<and>
+ "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. landerInv s \<le> 0 \<and>
              (\<lambda>s. s T = 0 \<and> s T < Period) s \<and>
              supp s \<subseteq> {V, W, T} \<and> P tr}
      Cont (ODE ((\<lambda>_ _. 0)(V := (\<lambda>s. s W - 3.732), W := (\<lambda>s. (s W)^2 / 2500 ), T := (\<lambda>_. 1)))) ((\<lambda>s. s T < Period))
@@ -120,7 +120,7 @@ apply clarify
 
 
 lemma P0_prop_st:
-  "\<Turnstile> {\<lambda>s tr. s = (\<lambda>_. 0)(V := v0, W := w0, T := Period) \<and>
+  "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. s = (\<lambda>_. 0)(V := v0, W := w0, T := Period) \<and>
                   landerinv 0 v0 w0 \<le> 0 \<and> emp\<^sub>t tr}
      P0
    {\<lambda>s tr. \<exists>n v w. s = (\<lambda>_. 0)(V := v, W := w, T := Period) \<and>
@@ -167,7 +167,7 @@ lemma P0_prop_st:
 
 
 lemma P0_prop:
-  "\<Turnstile> {\<lambda>s tr. s = (\<lambda>_. 0)(V := v0, W := w0, T := Period) \<and>
+  "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. s = (\<lambda>_. 0)(V := v0, W := w0, T := Period) \<and>
                   landerinv 0 v0 w0 \<le> 0 \<and> emp\<^sub>t tr}
      P0
    {\<lambda>s tr. \<exists>n v w. s = (\<lambda>_. 0)(V := v, W := w, T := Period) \<and>

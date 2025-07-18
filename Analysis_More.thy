@@ -20,8 +20,8 @@ lemma has_vderiv_on_proj:
   by (simp add: has_vector_derivative_proj)
 
 lemma has_vector_derivative_projI:
-  assumes "\<forall>i. ((\<lambda>t. p t $ i) has_vector_derivative q t $ i) (at t within D)"
-  shows "(p has_vector_derivative q t) (at t within D)"
+  assumes "\<forall>i. ((\<lambda>t. p t $ i) has_vector_derivative q $ i) (at t within D)"
+  shows "(p has_vector_derivative q) (at t within D)"
   using assms unfolding has_vector_derivative_def has_derivative_def
   apply (auto simp add: bounded_linear_scaleR_left)
   by (auto intro: vec_tendstoI)
@@ -548,6 +548,40 @@ text \<open>History p on time {0 .. d} is a solution to ode.\<close>
 definition ODEsol :: "ODE \<Rightarrow> (real \<Rightarrow> state) \<Rightarrow> real \<Rightarrow> bool" where
   "ODEsol ode p d = (d \<ge> 0 \<and> (\<exists>\<epsilon>>0. ((\<lambda>t. state2vec (p t)) has_vderiv_on (\<lambda>t. ODE2Vec ode (p t))) {-\<epsilon> .. d+\<epsilon>}))"
 
+lemma finite_arg_min:
+  fixes ds :: "'k::finite \<Rightarrow> real"
+  shows "\<exists>k. \<forall>k'. ds k \<le> ds k'"
+proof -
+  let ?S = "range ds"
+  have "finite ?S" by simp
+  then have "?S \<noteq> {}" by auto
+  then have "Min ?S \<in> ?S"
+    using \<open>finite ?S\<close> by simp
+  then obtain k where "ds k = Min ?S"
+    by force
+  then show ?thesis
+    by (metis Min_le \<open>finite (range ds)\<close> rangeI)
+qed
+
+lemma ODEsol_k:
+  fixes ps :: "('k :: finite) \<Rightarrow> real \<Rightarrow> state"
+  assumes "\<forall>k. ODEsol ode (ps k) d"
+  shows "\<exists>e > 0. (\<forall>k. ((\<lambda>t. state2vec (ps k t)) has_vderiv_on (\<lambda>t. ODE2Vec ode (ps k t))) {-e .. d+e})"
+proof-
+  from assms have "\<forall>k. \<exists>e > 0. ((\<lambda>t. state2vec (ps k t)) has_vderiv_on (\<lambda>t. ODE2Vec ode (ps k t))) {-e .. d+e}"
+    using ODEsol_def by blast
+  then obtain es where 1: "(\<forall>k. es k > 0 \<and> ((\<lambda>t. state2vec (ps k t)) has_vderiv_on (\<lambda>t. ODE2Vec ode (ps k t))) {-es k .. d+es k})"
+    by metis
+  obtain k' where 2: "\<forall>k. es k' \<le> es k"
+    using finite_arg_min[of es] by blast
+  let ?e = "es k'"
+  have "\<forall>k. ((\<lambda>t. state2vec (ps k t)) has_vderiv_on (\<lambda>t. ODE2Vec ode (ps k t))) {-?e .. d+?e}"
+    by (metis "1" "2" add_le_cancel_left atLeastatMost_subset_iff has_vderiv_on_subset le_imp_neg_le)
+  with 1 show ?thesis
+    by blast
+qed
+
+
 lemma ODEsol_le: "\<lbrakk>ODEsol ode p d; t \<le> d; t \<ge> 0\<rbrakk> \<Longrightarrow> ODEsol ode p t"
   apply (simp add: ODEsol_def)
   by (meson add_le_cancel_right atLeastatMost_subset_iff dual_order.refl has_vderiv_on_subset)
@@ -619,24 +653,27 @@ proof-
     by auto
 qed
 
-lemma ODEsol_old_k:
-  assumes "\<forall>k. ODEsol ode (ps k) d"
-  shows "((\<lambda>t. state2vec_k (\<lambda>k. ps k t)) has_vderiv_on (\<lambda>t. ODE2Vec_k ode (\<lambda>k. ps k t))) {0 .. d}"
-  using has_vdriv_on_projI[of "\<lambda>t. state2vec_k (\<lambda>k. ps k t)" "\<lambda>t. ODE2Vec_k ode (\<lambda>k. ps k t)" "{0..d}"]
+lemma ODEsol_old_k':
+  assumes "\<forall>k. ((\<lambda>t. state2vec (ps k t)) has_vderiv_on (\<lambda>t. ODE2Vec ode (ps k t))) D"
+  shows "((\<lambda>t. state2vec_k (\<lambda>k. ps k t)) has_vderiv_on (\<lambda>t. ODE2Vec_k ode (\<lambda>k. ps k t))) D"
 proof-
-  have "\<exists>f. ode = ODE f"
-    by (meson ODE.exhaust)
-  then obtain f where "ode = ODE f" 
-    by auto
-  from assms have "\<forall>k. ((\<lambda>t. state2vec (ps k t)) has_vderiv_on (\<lambda>t. ODE2Vec ode (ps k t))) {0 .. d}"
+   obtain f where "ode = ODE f" 
+    by (meson ODE2Vec.elims)
+  from assms have "\<forall>k. ((\<lambda>t. state2vec (ps k t)) has_vderiv_on (\<lambda>t. ODE2Vec ode (ps k t))) D"
     using ODEsol_old by blast
-  then have "\<forall>k i. ((\<lambda>x. ps k x i) has_vderiv_on (\<lambda>x. f i (ps k x))) {0..d}"
+  then have "\<forall>k i. ((\<lambda>x. ps k x i) has_vderiv_on (\<lambda>x. f i (ps k x))) D"
     using ODE2Vec.simps \<open>ode = ODE f\<close> has_vderiv_on_proj state2vec_def by fastforce
   then show ?thesis
-    using has_vdriv_on_projI[of "\<lambda>t. state2vec_k (\<lambda>k. ps k t)" "\<lambda>t. ODE2Vec_k ode (\<lambda>k. ps k t)" "{0..d}"]
+    using has_vdriv_on_projI[of "\<lambda>t. state2vec_k (\<lambda>k. ps k t)" "\<lambda>t. ODE2Vec_k ode (\<lambda>k. ps k t)" "D"]
     \<open>ode = ODE f\<close> state2vec_k_def 
     by (smt (z3) ODE2Vec_k.simps has_vderiv_on_def has_vector_derivative_transform vec_lambda_beta)
 qed
+
+lemma ODEsol_old_k:
+  assumes "\<forall>k. ODEsol ode (ps k) d"
+  shows "((\<lambda>t. state2vec_k (\<lambda>k. ps k t)) has_vderiv_on (\<lambda>t. ODE2Vec_k ode (\<lambda>k. ps k t))) {0 .. d}"
+  using ODEsol_old_k'[of ps ode "{0 .. d}"] assms ODEsol_old
+  by blast
 
 lemma ODEsolInf_old:
    assumes "ODEsolInf ode p"
