@@ -265,16 +265,24 @@ proof (rule hyper_hoare_tripleI)
   then show "P (sem (Havoc x) S)" using sem_havoc by metis
 qed
 
+lemma wait_rule:
+  "\<Turnstile> {(\<lambda>S. P ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S \<and> \<not> 0 < e \<sigma>\<^sub>p} \<union>
+  {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk (e \<sigma>\<^sub>p) (\<lambda>_. State \<sigma>\<^sub>p) ({}, {})]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. 0 < e \<sigma>\<^sub>p \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}))} (Wait e) {P}"
+proof (rule hyper_hoare_tripleI)
+  fix S
+  assume "P ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S \<and> \<not> 0 < e \<sigma>\<^sub>p} \<union> 
+  {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk (e \<sigma>\<^sub>p) (\<lambda>_. State \<sigma>\<^sub>p) ({}, {})]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. 0 < e \<sigma>\<^sub>p \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S})"
+  then show " P (sem (Wait e) S)" 
+    using sem_wait by metis
+qed
 
 lemma send_rule:
   "\<Turnstile> {(\<lambda>S. P ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [OutBlock ch (e \<sigma>\<^sub>p)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
-  {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk d (\<lambda>_. State \<sigma>\<^sub>p) ({ch}, {}), OutBlock ch (e \<sigma>\<^sub>p)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d. (d::real) > 0 \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
-  {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk \<infinity> (\<lambda>_. State \<sigma>\<^sub>p) ({ch}, {})]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}))} (Cm (ch[!]e)) {P}"
+  {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk d (\<lambda>_. State \<sigma>\<^sub>p) ({ch}, {}), OutBlock ch (e \<sigma>\<^sub>p)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d. (d::real) > 0 \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}))} (Cm (ch[!]e)) {P}"
 proof (rule hyper_hoare_tripleI)
   fix S
   assume "P ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [OutBlock ch (e \<sigma>\<^sub>p)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
-  {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk d (\<lambda>_. State \<sigma>\<^sub>p) ({ch}, {}), OutBlock ch (e \<sigma>\<^sub>p)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d. (d::real) > 0 \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
-  {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk \<infinity> (\<lambda>_. State \<sigma>\<^sub>p) ({ch}, {})]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S})"
+  {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk d (\<lambda>_. State \<sigma>\<^sub>p) ({ch}, {}), OutBlock ch (e \<sigma>\<^sub>p)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d. (d::real) > 0 \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S})"
   then show "P (sem (Cm (ch[!]e)) S)"
     using sem_send by metis
 qed
@@ -282,14 +290,12 @@ qed
 lemma recv_rule:
   "\<Turnstile> {(\<lambda>S. P ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p(var := v), l @ [InBlock ch v]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
   {(\<sigma>\<^sub>l, \<sigma>\<^sub>p(var := v), l @ [WaitBlk d (\<lambda>_. State \<sigma>\<^sub>p) ({}, {ch}), InBlock ch v]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d v. (d::real) > 0 
-  \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
-  {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk \<infinity> (\<lambda>_. State \<sigma>\<^sub>p) ({}, {ch})]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}))} (Cm (ch[?]var)) {P}"
+  \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}))} (Cm (ch[?]var)) {P}"
 proof(rule hyper_hoare_tripleI)
   fix S
   assume "P ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p(var := v), l @ [InBlock ch v]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
   {(\<sigma>\<^sub>l, \<sigma>\<^sub>p(var := v), l @ [WaitBlk d (\<lambda>_. State \<sigma>\<^sub>p) ({}, {ch}), InBlock ch v]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d v. (d::real) > 0 
-  \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
-  {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk \<infinity> (\<lambda>_. State \<sigma>\<^sub>p) ({}, {ch})]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S})"
+  \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S})"
   then show "P (sem (Cm (ch[?]var)) S)"
     using sem_recv by metis
 qed
@@ -364,16 +370,16 @@ qed
 
 lemma rule_cont_sp: 
   "\<Turnstile> {P} (Cont ode b) {join (\<lambda>S. \<exists>S0. P S0 \<and> S = {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S0 \<and> \<not> b \<sigma>\<^sub>p})
-  (\<lambda>S. \<exists>S0. P S0 \<and> S = {(\<sigma>\<^sub>l, p d, l @ [WaitBlk (ereal d) (\<lambda>\<tau>. State (p \<tau>)) ({}, {})]) |\<sigma>\<^sub>l l p d. 
+  (\<lambda>S. \<exists>S0. P S0 \<and> S = {(\<sigma>\<^sub>l, p d, l @ [WaitBlk ( d) (\<lambda>\<tau>. State (p \<tau>)) ({}, {})]) |\<sigma>\<^sub>l l p d. 
   (\<sigma>\<^sub>l, p 0, l) \<in> S0 \<and> 0 < d \<and> ODEsol ode p d \<and> (\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (p t)) \<and> \<not> b (p d)})}"
 proof(rule hyper_hoare_tripleI)
   fix S
   assume "P S"
   then have "join (\<lambda>S. \<exists>S0. P S0 \<and> S = {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S0 \<and> \<not> b \<sigma>\<^sub>p})
-  (\<lambda>S. \<exists>S0. P S0 \<and> S = {(\<sigma>\<^sub>l, p d, l @ [WaitBlk (ereal d) (\<lambda>\<tau>. State (p \<tau>)) ({}, {})]) |\<sigma>\<^sub>l l p d. 
+  (\<lambda>S. \<exists>S0. P S0 \<and> S = {(\<sigma>\<^sub>l, p d, l @ [WaitBlk ( d) (\<lambda>\<tau>. State (p \<tau>)) ({}, {})]) |\<sigma>\<^sub>l l p d. 
   (\<sigma>\<^sub>l, p 0, l) \<in> S0 \<and> 0 < d \<and> ODEsol ode p d \<and> (\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (p t)) \<and> \<not> b (p d)})
   ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S \<and> \<not> b \<sigma>\<^sub>p} \<union>
-  {(\<sigma>\<^sub>l, p d, l @ [WaitBlk (ereal d) (\<lambda>\<tau>. State (p \<tau>)) ({}, {})]) |\<sigma>\<^sub>l l p d. (\<sigma>\<^sub>l, p 0, l) \<in> S \<and> 0 < d 
+  {(\<sigma>\<^sub>l, p d, l @ [WaitBlk ( d) (\<lambda>\<tau>. State (p \<tau>)) ({}, {})]) |\<sigma>\<^sub>l l p d. (\<sigma>\<^sub>l, p 0, l) \<in> S \<and> 0 < d 
   \<and> ODEsol ode p d \<and> (\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (p t)) \<and> \<not> b (p d)})" (is "join ?A ?B (?S1 \<union> ?S2)")
   proof-
     have "?A ?S1" "?B ?S2"
@@ -382,7 +388,7 @@ proof(rule hyper_hoare_tripleI)
       by (smt (verit, del_insts) join_def)
   qed
   then show "join (\<lambda>S. \<exists>S0. P S0 \<and> S = {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S0 \<and> \<not> b \<sigma>\<^sub>p})
-  (\<lambda>S. \<exists>S0. P S0 \<and> S = {(\<sigma>\<^sub>l, p d, l @ [WaitBlk (ereal d) (\<lambda>\<tau>. State (p \<tau>)) ({}, {})]) |\<sigma>\<^sub>l l p d. 
+  (\<lambda>S. \<exists>S0. P S0 \<and> S = {(\<sigma>\<^sub>l, p d, l @ [WaitBlk ( d) (\<lambda>\<tau>. State (p \<tau>)) ({}, {})]) |\<sigma>\<^sub>l l p d. 
   (\<sigma>\<^sub>l, p 0, l) \<in> S0 \<and> 0 < d \<and> ODEsol ode p d \<and> (\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (p t)) \<and> \<not> b (p d)})
   (sem (Cont ode b) S)"
     by (metis (mono_tags, lifting) sem_ode)
@@ -398,13 +404,14 @@ inductive hoare :: "('lvar, 'lval) hyper_assn \<Rightarrow> proc \<Rightarrow> (
 | AssumeH: "\<turnstile> {(\<lambda>S. P (Set.filter (b \<circ> fst \<circ> snd) S)) } (Assume b) {P}"
 | IChoiceH: "\<lbrakk>\<turnstile> {P} C1 {Q1}; \<turnstile> {P} C2 {Q2} \<rbrakk> \<Longrightarrow> \<turnstile> {P} IChoice C1 C2 {join Q1 Q2}"
 | RepH: "\<lbrakk>\<And>n. \<turnstile> {I n} C {I (Suc n)} \<rbrakk> \<Longrightarrow> \<turnstile> {I 0} (Rep C) {natural_partition I}"
+| WaitH: "\<turnstile> {(\<lambda>S. P ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S \<and> \<not> 0 < e \<sigma>\<^sub>p} \<union>
+  {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk (e \<sigma>\<^sub>p) (\<lambda>_. State \<sigma>\<^sub>p) ({}, {})]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. 0 < e \<sigma>\<^sub>p \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}))} (Wait e) {P}"
 | SendH: "\<turnstile> {(\<lambda>S. P ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [OutBlock ch (e \<sigma>\<^sub>p)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
-  {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk d (\<lambda>_. State \<sigma>\<^sub>p) ({ch}, {}), OutBlock ch (e \<sigma>\<^sub>p)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d. (d::real) > 0 \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
-  {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk \<infinity> (\<lambda>_. State \<sigma>\<^sub>p) ({ch}, {})]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}))} (Cm (ch[!]e)) {P}"
+  {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk d (\<lambda>_. State \<sigma>\<^sub>p) ({ch}, {}), OutBlock ch (e \<sigma>\<^sub>p)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d. (d::real) > 0 \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}))} 
+  (Cm (ch[!]e)) {P}"
 | RecvH: "\<turnstile> {(\<lambda>S. P ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p(var := v), l @ [InBlock ch v]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
   {(\<sigma>\<^sub>l, \<sigma>\<^sub>p(var := v), l @ [WaitBlk d (\<lambda>_. State \<sigma>\<^sub>p) ({}, {ch}), InBlock ch v]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d v. (d::real) > 0 
-  \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
-  {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk \<infinity> (\<lambda>_. State \<sigma>\<^sub>p) ({}, {ch})]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}))} (Cm (ch[?]var)) {P}"
+  \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}))} (Cm (ch[?]var)) {P}"
 | ContH: "\<turnstile> {(\<lambda>S. P ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S \<and> \<not> b \<sigma>\<^sub>p} \<union> 
   {(\<sigma>\<^sub>l, p d, l @ [WaitBlk d (\<lambda>\<tau>. State (p \<tau>)) ({}, {})]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l p d. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S \<and> d > 0 \<and> 
   ODEsol ode p d \<and> (\<forall>t. t \<ge> 0 \<and> t < d \<longrightarrow> b (p t)) \<and> \<not>b (p d) \<and> p 0 = \<sigma>\<^sub>p}))} (Cont ode b) {P}"
@@ -468,7 +475,6 @@ lemma big_step_Suc_impl:
    apply (metis big_step_interrupt.intros(5))
   by (simp add: big_step_interrupt.intros(6))
            
-
 definition sem_interrupt :: "nat \<Rightarrow> ODE \<Rightarrow> fform \<Rightarrow> (comm \<times> proc) list \<Rightarrow> ('lvar, 'lval) exstate set \<Rightarrow> ('lvar, 'lval) exstate set"
   where "sem_interrupt n ode b cs \<Sigma> = {(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l @ l') |\<sigma>\<^sub>l \<sigma>\<^sub>p \<sigma>\<^sub>p' l l'. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> \<Sigma> \<and> 
                                         big_step_interrupt n ode b cs \<sigma>\<^sub>p l' \<sigma>\<^sub>p'}"
@@ -521,7 +527,7 @@ next
     proof(rule subsetTupleI)
       fix \<sigma>\<^sub>l \<sigma>\<^sub>p' tr
       assume "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr) \<in> ?C"
-      then obtain \<sigma>\<^sub>p d l sl where asm0: "tr = l @ [WaitBlk (ereal d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs)]"
+      then obtain \<sigma>\<^sub>p d l sl where asm0: "tr = l @ [WaitBlk ( d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs)]"
       "(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> \<Sigma>" "0 < d" "ODEsol ode sl d" "\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (sl t)"
       "\<not> b (sl d)" "sl 0 = \<sigma>\<^sub>p" "sl d = \<sigma>\<^sub>p'" 
         by auto
@@ -533,7 +539,6 @@ next
     qed
   qed
 qed
-
 
 lemma sem_interrupt_Suc_Send:
   assumes "cs ! n = (ch[!]e, C)"
@@ -576,7 +581,7 @@ proof
     next
       fix d p i cha ea p2 tr2
       assume b: "(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> \<Sigma>" "big_step_interrupt (Suc n) ode b cs \<sigma>\<^sub>p l' \<sigma>\<^sub>p'"
-      "tr = l @ l'" "l' = WaitBlk (ereal d) (\<lambda>\<tau>. State (p \<tau>)) (rdy_of_echoice cs) # OutBlock cha (ea (p d)) # tr2"
+      "tr = l @ l'" "l' = WaitBlk ( d) (\<lambda>\<tau>. State (p \<tau>)) (rdy_of_echoice cs) # OutBlock cha (ea (p d)) # tr2"
       "0 < d" "ODEsol ode p d" "p 0 = \<sigma>\<^sub>p" "\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (p t)" "i < Suc n" "cs ! i = (cha[!]ea, p2)"
       "big_step p2 (p d) tr2 \<sigma>\<^sub>p'"
       then show ?thesis (is "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr) \<in> ?A1 \<union> ?B1 \<union> ?C1")
@@ -590,7 +595,7 @@ proof
         assume "i \<noteq> n"
         with b(9) have "i < n" 
           by auto
-        with b have "big_step_interrupt n ode b cs \<sigma>\<^sub>p (WaitBlk (ereal d) (\<lambda>\<tau>. State (p \<tau>)) 
+        with b have "big_step_interrupt n ode b cs \<sigma>\<^sub>p (WaitBlk ( d) (\<lambda>\<tau>. State (p \<tau>)) 
                     (rdy_of_echoice cs) # OutBlock cha (ea (p d)) # tr2) \<sigma>\<^sub>p'"
           using big_step_interrupt.intros(2) by auto
         with b have "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr) \<in> ?A1"
@@ -619,7 +624,7 @@ proof
     next
       fix d p i ch var p2 v tr2
       assume c: "(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> \<Sigma>" "big_step_interrupt (Suc n) ode b cs \<sigma>\<^sub>p l' \<sigma>\<^sub>p'" "tr = l @ l'" 
-      "l' = WaitBlk (ereal d) (\<lambda>\<tau>. State (p \<tau>)) (rdy_of_echoice cs) # InBlock ch v # tr2"
+      "l' = WaitBlk ( d) (\<lambda>\<tau>. State (p \<tau>)) (rdy_of_echoice cs) # InBlock ch v # tr2"
       "0 < d" "ODEsol ode p d" "p 0 = \<sigma>\<^sub>p" "\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (p t)" "i < Suc n" 
       "cs ! i = (ch[?]var, p2)" "big_step p2 ((p d)(var := v)) tr2 \<sigma>\<^sub>p'"
       then show ?thesis
@@ -632,7 +637,7 @@ proof
         with c(9) have "i < n"
           by auto
         with c have "big_step_interrupt n ode b cs \<sigma>\<^sub>p 
-        (WaitBlk (ereal d) (\<lambda>\<tau>. State (p \<tau>)) (rdy_of_echoice cs) # InBlock ch v # tr2) \<sigma>\<^sub>p'"
+        (WaitBlk ( d) (\<lambda>\<tau>. State (p \<tau>)) (rdy_of_echoice cs) # InBlock ch v # tr2) \<sigma>\<^sub>p'"
           using big_step_interrupt.intros(4) by auto
         with c have "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr) \<in> sem_interrupt n ode b cs \<Sigma>"
           using in_sem_interrupt by fastforce
@@ -649,9 +654,9 @@ proof
     next
       fix d p
       assume d: "(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> \<Sigma>" "big_step_interrupt (Suc n) ode b cs \<sigma>\<^sub>p l' \<sigma>\<^sub>p'" "tr = l @ l'" 
-      "l' = [WaitBlk (ereal d) (\<lambda>\<tau>. State (p \<tau>)) (rdy_of_echoice cs)]" "0 < d" "ODEsol ode p d" 
+      "l' = [WaitBlk ( d) (\<lambda>\<tau>. State (p \<tau>)) (rdy_of_echoice cs)]" "0 < d" "ODEsol ode p d" 
       "\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (p t)" "\<not> b \<sigma>\<^sub>p'" "p 0 = \<sigma>\<^sub>p" "p d = \<sigma>\<^sub>p'"
-      then have "big_step_interrupt n ode b cs \<sigma>\<^sub>p [WaitBlk (ereal d) (\<lambda>\<tau>. State (p \<tau>)) (rdy_of_echoice cs)] \<sigma>\<^sub>p'"
+      then have "big_step_interrupt n ode b cs \<sigma>\<^sub>p [WaitBlk ( d) (\<lambda>\<tau>. State (p \<tau>)) (rdy_of_echoice cs)] \<sigma>\<^sub>p'"
         using big_step_interrupt.intros(6) by auto
       with d have "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr) \<in> sem_interrupt n ode b cs \<Sigma>"
         using sem_interrupt_def by fastforce
@@ -713,7 +718,7 @@ proof
     next
       fix d p i cha ea p2 tr2
       assume b: "(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> \<Sigma>" "big_step_interrupt (Suc n) ode b cs \<sigma>\<^sub>p l' \<sigma>\<^sub>p'"
-      "tr = l @ l'" "l' = WaitBlk (ereal d) (\<lambda>\<tau>. State (p \<tau>)) (rdy_of_echoice cs) # OutBlock cha (ea (p d)) # tr2"
+      "tr = l @ l'" "l' = WaitBlk ( d) (\<lambda>\<tau>. State (p \<tau>)) (rdy_of_echoice cs) # OutBlock cha (ea (p d)) # tr2"
       "0 < d" "ODEsol ode p d" "p 0 = \<sigma>\<^sub>p" "\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (p t)" "i < Suc n" "cs ! i = (cha[!]ea, p2)"
       "big_step p2 (p d) tr2 \<sigma>\<^sub>p'"
       then show ?thesis
@@ -725,7 +730,7 @@ proof
         assume "i \<noteq> n"
         with b(9) have "i < n" 
           by auto
-        with b have "big_step_interrupt n ode b cs \<sigma>\<^sub>p (WaitBlk (ereal d) (\<lambda>\<tau>. State (p \<tau>)) 
+        with b have "big_step_interrupt n ode b cs \<sigma>\<^sub>p (WaitBlk ( d) (\<lambda>\<tau>. State (p \<tau>)) 
                     (rdy_of_echoice cs) # OutBlock cha (ea (p d)) # tr2) \<sigma>\<^sub>p'"
           using big_step_interrupt.intros(2) by auto
         with b have "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr) \<in> sem_interrupt n ode b cs \<Sigma>"
@@ -757,7 +762,7 @@ proof
     next
       fix d p i ch var p2 v tr2
       assume c: "(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> \<Sigma>" "big_step_interrupt (Suc n) ode b cs \<sigma>\<^sub>p l' \<sigma>\<^sub>p'" "tr = l @ l'" 
-      "l' = WaitBlk (ereal d) (\<lambda>\<tau>. State (p \<tau>)) (rdy_of_echoice cs) # InBlock ch v # tr2"
+      "l' = WaitBlk ( d) (\<lambda>\<tau>. State (p \<tau>)) (rdy_of_echoice cs) # InBlock ch v # tr2"
       "0 < d" "ODEsol ode p d" "p 0 = \<sigma>\<^sub>p" "\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (p t)" "i < Suc n" 
       "cs ! i = (ch[?]var, p2)" "big_step p2 ((p d)(var := v)) tr2 \<sigma>\<^sub>p'"
       then show ?thesis (is "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr) \<in> ?A1 \<union> ?B1 \<union> ?C1")
@@ -774,7 +779,7 @@ proof
         with c(9) have "i < n"
           by auto
         with c have "big_step_interrupt n ode b cs \<sigma>\<^sub>p 
-        (WaitBlk (ereal d) (\<lambda>\<tau>. State (p \<tau>)) (rdy_of_echoice cs) # InBlock ch v # tr2) \<sigma>\<^sub>p'"
+        (WaitBlk ( d) (\<lambda>\<tau>. State (p \<tau>)) (rdy_of_echoice cs) # InBlock ch v # tr2) \<sigma>\<^sub>p'"
           using big_step_interrupt.intros(4) by auto
         with c have "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr) \<in> sem_interrupt n ode b cs \<Sigma>"
           using in_sem_interrupt by fastforce
@@ -791,9 +796,9 @@ proof
     next
       fix d p
       assume d: "(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> \<Sigma>" "big_step_interrupt (Suc n) ode b cs \<sigma>\<^sub>p l' \<sigma>\<^sub>p'" "tr = l @ l'" 
-      "l' = [WaitBlk (ereal d) (\<lambda>\<tau>. State (p \<tau>)) (rdy_of_echoice cs)]" "0 < d" "ODEsol ode p d" 
+      "l' = [WaitBlk ( d) (\<lambda>\<tau>. State (p \<tau>)) (rdy_of_echoice cs)]" "0 < d" "ODEsol ode p d" 
       "\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (p t)" "\<not> b \<sigma>\<^sub>p'" "p 0 = \<sigma>\<^sub>p" "p d = \<sigma>\<^sub>p'"
-      then have "big_step_interrupt n ode b cs \<sigma>\<^sub>p [WaitBlk (ereal d) (\<lambda>\<tau>. State (p \<tau>)) (rdy_of_echoice cs)] \<sigma>\<^sub>p'"
+      then have "big_step_interrupt n ode b cs \<sigma>\<^sub>p [WaitBlk ( d) (\<lambda>\<tau>. State (p \<tau>)) (rdy_of_echoice cs)] \<sigma>\<^sub>p'"
         using big_step_interrupt.intros(6) by auto
       with d have "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr) \<in> sem_interrupt n ode b cs \<Sigma>"
         using sem_interrupt_def by fastforce
@@ -890,7 +895,7 @@ proof-
     proof(rule subsetTupleI)
       fix \<sigma>\<^sub>l \<sigma>\<^sub>p' l'
       assume "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l') \<in> ?A"
-      then obtain \<sigma>\<^sub>p tr0 d sl i ch e p tr1 where b: "l' = tr0 @ WaitBlk (ereal d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs) # OutBlock ch (e (sl d)) # tr1"
+      then obtain \<sigma>\<^sub>p tr0 d sl i ch e p tr1 where b: "l' = tr0 @ WaitBlk ( d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs) # OutBlock ch (e (sl d)) # tr1"
       "(\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> S" "d > 0" "ODEsol ode sl d" "sl 0 = \<sigma>\<^sub>p" "(\<forall>t. t \<ge> 0 \<and> t < d \<longrightarrow> b (sl t))" 
       "i < (Suc n)" "cs ! i = (Send ch e, p)" "big_step p (sl d) tr1 \<sigma>\<^sub>p'"
         by blast
@@ -1050,7 +1055,7 @@ proof-
       fix \<sigma>\<^sub>l \<sigma>\<^sub>p' l'
       assume "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', l') \<in> ?A"
       then obtain \<sigma>\<^sub>p tr0 d sl i ch var v p tr1 where d: 
-      "l' = tr0 @ WaitBlk (ereal d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs) # InBlock ch v # tr1"
+      "l' = tr0 @ WaitBlk ( d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs) # InBlock ch v # tr1"
       "(\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> S" "d > 0" "ODEsol ode sl d" "sl 0 = \<sigma>\<^sub>p" "(\<forall>t. t \<ge> 0 \<and> t < d \<longrightarrow> b (sl t))" 
       "i < (Suc n)" "cs ! i = (Receive ch var, p)" "big_step p ((sl d)(var := v)) tr1 \<sigma>\<^sub>p'"
         by blast
@@ -1120,6 +1125,9 @@ next
   then show ?case
     using havoc_rule by blast
 next
+  case (WaitH P e)
+  then show ?case
+    by (simp add: wait_rule)
   case (SeqH P C1 R C2 Q)
   then show ?case
     by (simp add: seq_rule)
@@ -1166,10 +1174,10 @@ next
     fix \<Sigma>
     assume b0: "P \<Sigma>"
     let ?S1 = "{(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [OutBlock ch (e \<sigma>\<^sub>p)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> \<Sigma>}"
-    and ?S2 = "{(\<sigma>\<^sub>l, sl d, l @ [WaitBlk (ereal d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), OutBlock ch (e (sl d))]) 
+    and ?S2 = "{(\<sigma>\<^sub>l, sl d, l @ [WaitBlk ( d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), OutBlock ch (e (sl d))]) 
     |\<sigma>\<^sub>l \<sigma>\<^sub>p l d sl. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> \<Sigma> \<and> 0 < d \<and> ODEsol ode sl d \<and> sl 0 = \<sigma>\<^sub>p \<and> (\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (sl t))}"
     and ?P = "\<lambda>S. \<exists>S0. P S0 \<and> S = ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [OutBlock ch (e \<sigma>\<^sub>p)]) 
-    |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S0} \<union> {(\<sigma>\<^sub>l, sl d, l @ [WaitBlk (ereal d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), 
+    |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S0} \<union> {(\<sigma>\<^sub>l, sl d, l @ [WaitBlk ( d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), 
     OutBlock ch (e (sl d))]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d sl. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S0 \<and> 0 < d \<and> ODEsol ode sl d \<and> sl 0 = \<sigma>\<^sub>p 
     \<and> (\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (sl t))})"
     from b0 have "?P (?S1 \<union> ?S2)"
@@ -1203,10 +1211,10 @@ next
     fix \<Sigma>
     assume c0: "P \<Sigma>"
     let ?S1 = "{(\<sigma>\<^sub>l, \<sigma>\<^sub>p(var := v), l @ [InBlock ch v]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> \<Sigma>}"
-    and ?S2 = "{(\<sigma>\<^sub>l, (sl d)(var := v), l @ [WaitBlk (ereal d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), InBlock ch v])
+    and ?S2 = "{(\<sigma>\<^sub>l, (sl d)(var := v), l @ [WaitBlk ( d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), InBlock ch v])
     |\<sigma>\<^sub>l \<sigma>\<^sub>p l d sl v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> \<Sigma> \<and> 0 < d \<and> ODEsol ode sl d \<and> sl 0 = \<sigma>\<^sub>p \<and> (\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (sl t))}"
     and ?P = "\<lambda>S. \<exists>S0. P S0 \<and> S = ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p(var := v), l @ [InBlock ch v]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S0} \<union>
-    {(\<sigma>\<^sub>l, (sl d)(var := v), l @ [WaitBlk (ereal d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), InBlock ch v])
+    {(\<sigma>\<^sub>l, (sl d)(var := v), l @ [WaitBlk ( d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), InBlock ch v])
     |\<sigma>\<^sub>l \<sigma>\<^sub>p l d sl v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S0 \<and> 0 < d \<and> ODEsol ode sl d \<and> sl 0 = \<sigma>\<^sub>p \<and> (\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (sl t))})"
     from c0 have "?P (?S1 \<union> ?S2)"
       by (rule_tac x = \<Sigma> in exI, simp)
@@ -1464,6 +1472,28 @@ proof (rule completeI)
   qed
 qed
 
+lemma complete_wait:
+  "complete P (Wait e) Q"
+proof(rule completeI)
+  assume assm0: "\<Turnstile> {P} Wait e {Q}"
+  show "\<turnstile> {P} Wait e {Q}"
+  proof(rule ConsH)
+    show "\<turnstile> {(\<lambda>S. Q ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S \<and> \<not> 0 < e \<sigma>\<^sub>p} \<union>
+    {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk (e \<sigma>\<^sub>p) (\<lambda>_. State \<sigma>\<^sub>p) ({}, {})]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. 0 < e \<sigma>\<^sub>p \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}))} Wait e {Q}"
+      using WaitH by blast
+    show "hyper_entails P (\<lambda>S. Q ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S \<and> \<not> 0 < e \<sigma>\<^sub>p} \<union> 
+   {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk (e \<sigma>\<^sub>p) (\<lambda>_. State \<sigma>\<^sub>p) ({}, {})]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. 0 < e \<sigma>\<^sub>p \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}))"
+    proof(rule hyper_entailsI)
+      fix S assume "P S"
+      then show "Q ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S \<and> \<not> 0 < e \<sigma>\<^sub>p} \<union>
+      {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk (e \<sigma>\<^sub>p) (\<lambda>_. State \<sigma>\<^sub>p) ({}, {})]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. 0 < e \<sigma>\<^sub>p \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S})"
+        by (metis assm0 hyper_hoare_triple_def sem_wait)
+    qed
+    show "hyper_entails Q Q"
+      by (simp add: hyper_entailsI)
+  qed
+qed
+
 lemma complete_send:
   "complete P (Cm (ch[!]e)) Q"
 proof(rule completeI)
@@ -1471,17 +1501,16 @@ proof(rule completeI)
   show " \<turnstile> {P} Cm (ch[!]e) {Q}"
   proof (rule ConsH)
     show "\<turnstile> {(\<lambda>S. Q ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [OutBlock ch (e \<sigma>\<^sub>p)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union> {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, 
-    l @ [WaitBlk d (\<lambda>_. State \<sigma>\<^sub>p) ({ch}, {}), OutBlock ch (e \<sigma>\<^sub>p)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d. (d::real) > 0 \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
-    {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk \<infinity> (\<lambda>_. State \<sigma>\<^sub>p) ({ch}, {})]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}))} (Cm (ch[!]e)) {Q}"
+    l @ [WaitBlk d (\<lambda>_. State \<sigma>\<^sub>p) ({ch}, {}), OutBlock ch (e \<sigma>\<^sub>p)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d. (d::real) > 0 \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}))} 
+    (Cm (ch[!]e)) {Q}"
       using SendH by blast
     show "hyper_entails P (\<lambda>S. Q ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [OutBlock ch (e \<sigma>\<^sub>p)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
-    {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk (ereal d) (\<lambda>_. State \<sigma>\<^sub>p) ({ch}, {}), OutBlock ch (e \<sigma>\<^sub>p)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d. 0 < d 
-    \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union> {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk \<infinity> (\<lambda>_. State \<sigma>\<^sub>p) ({ch}, {})]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}))"
+    {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk ( d) (\<lambda>_. State \<sigma>\<^sub>p) ({ch}, {}), OutBlock ch (e \<sigma>\<^sub>p)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d. 0 < d 
+    \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}))"
     proof (rule hyper_entailsI)
       fix S assume "P S"
       then show "Q ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [OutBlock ch (e \<sigma>\<^sub>p)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>  {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, 
-      l @ [WaitBlk (ereal d) (\<lambda>_. State \<sigma>\<^sub>p) ({ch}, {}), OutBlock ch (e \<sigma>\<^sub>p)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d. 0 < d \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
-      {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk \<infinity> (\<lambda>_. State \<sigma>\<^sub>p) ({ch}, {})]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S})"
+      l @ [WaitBlk ( d) (\<lambda>_. State \<sigma>\<^sub>p) ({ch}, {}), OutBlock ch (e \<sigma>\<^sub>p)]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d. 0 < d \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S})"
         by (metis assm0 hyper_hoare_triple_def sem_send)
     qed
     show "hyper_entails Q Q"
@@ -1497,19 +1526,16 @@ proof(rule completeI)
   proof (rule ConsH)
     show "\<turnstile> {(\<lambda>S. Q ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p(var := v), l @ [InBlock ch v]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
   {(\<sigma>\<^sub>l, \<sigma>\<^sub>p(var := v), l @ [WaitBlk d (\<lambda>_. State \<sigma>\<^sub>p) ({}, {ch}), InBlock ch v]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d v. (d::real) > 0 
-  \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union> {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk \<infinity> (\<lambda>_. State \<sigma>\<^sub>p) ({}, {ch})]) 
-  |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}))} (Cm (ch[?]var)) {Q}"
+  \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}))} (Cm (ch[?]var)) {Q}"
       using RecvH by blast
     show "hyper_entails P (\<lambda>S. Q ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p(var := v), l @ [InBlock ch v]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
-    {(\<sigma>\<^sub>l, \<sigma>\<^sub>p(var := v), l @ [WaitBlk (ereal d) (\<lambda>_. State \<sigma>\<^sub>p) ({}, {ch}), InBlock ch v]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d v.
-    0 < d \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union> {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk \<infinity> (\<lambda>_. State \<sigma>\<^sub>p) ({}, {ch})]) 
-    |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}))"
+    {(\<sigma>\<^sub>l, \<sigma>\<^sub>p(var := v), l @ [WaitBlk ( d) (\<lambda>_. State \<sigma>\<^sub>p) ({}, {ch}), InBlock ch v]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d v.
+    0 < d \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}))"
     proof (rule hyper_entailsI)
       fix S assume "P S"
       then show "Q ({(\<sigma>\<^sub>l, \<sigma>\<^sub>p(var := v), l @ [InBlock ch v]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union>
-      {(\<sigma>\<^sub>l, \<sigma>\<^sub>p(var := v), l @ [WaitBlk (ereal d) (\<lambda>_. State \<sigma>\<^sub>p) ({}, {ch}), InBlock ch v]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d v.
-      0 < d \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S} \<union> {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l @ [WaitBlk \<infinity> (\<lambda>_. State \<sigma>\<^sub>p) ({}, {ch})]) 
-      |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S})"
+      {(\<sigma>\<^sub>l, \<sigma>\<^sub>p(var := v), l @ [WaitBlk ( d) (\<lambda>_. State \<sigma>\<^sub>p) ({}, {ch}), InBlock ch v]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l d v.
+      0 < d \<and> (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S})"
         by (metis assm0 hyper_hoare_triple_def sem_recv)
     qed
     show "hyper_entails Q Q"
@@ -1672,7 +1698,7 @@ next
                \<union> int_comm_trace n ode b cs V \<and> P V)"
             by (simp add: Suc.hyps Suc.prems(2) Suc_leD)
           let ?P1 = "\<lambda>S. \<exists>S0. (P S0 \<and> S0 = V) \<and> S = {(\<sigma>\<^sub>l, \<sigma>\<^sub>p(var := v), l @ [InBlock ch v]) |\<sigma>\<^sub>l \<sigma>\<^sub>p l v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S0}
-          \<union> {(\<sigma>\<^sub>l, (sl d)(var := v), l @ [WaitBlk (ereal d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), InBlock ch v]) 
+          \<union> {(\<sigma>\<^sub>l, (sl d)(var := v), l @ [WaitBlk ( d) (\<lambda>\<tau>. State (sl \<tau>)) (rdy_of_echoice cs), InBlock ch v]) 
             |\<sigma>\<^sub>l \<sigma>\<^sub>p l d sl v. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S0 \<and> 0 < d \<and> ODEsol ode sl d \<and> sl 0 = \<sigma>\<^sub>p \<and> (\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (sl t))}"
           and ?Q1 = "\<lambda>S. S = int_recv_trace ode b cs C ch var V \<and> P V"
           have "\<Turnstile> {?P1} C {?Q1}"
@@ -1738,6 +1764,10 @@ next
   case (Assume x)
   then show ?case
     by (simp add: Logic.completeE complete_assume)
+next
+  case (Wait x)
+  then show ?case
+    by (simp add: Logic.completeE complete_wait)
 next
   case (IChoice C1 C2)
   then show ?case
@@ -1844,20 +1874,20 @@ proof (induct rule: combine_blocks.cases)
     using combine_blocks_wait1(2,3) by (auto simp add: WaitBlk_cong)
   have b: "WaitBlk d (\<lambda>t. ParState (p1 t) (p2 t)) (merge_rdy rdy1 rdy2) =
            WaitBlk t (\<lambda>t. ParState (hist1 t) (hist2 t)) (merge_rdy rdy1' rdy2')"
-    apply (rule WaitBlk_eq_combine) using combine_blocks_wait1(2,3) by auto 
+    by (smt (verit, ccfv_SIG) WaitBlk_eqE WaitBlk_eqI combine_blocks_wait1.hyps(2,3) list.inject)
   show ?case
     apply (rule combine_blocks_wait1)
     unfolding b using combine_blocks_wait1(4) unfolding a combine_blocks_wait1(7,8)
     by (auto simp add: combine_blocks_wait1(1,5))
 next
   case (combine_blocks_wait2 comms blks1 t2 t1 hist2 rdy2 blks2 blks rdy1 hist hist1 rdy)
-  have a: "d = ereal t1" "d = t2"
+  have a: "d =  t1" "d = t2"
     using combine_blocks_wait2(2,3) by (auto simp add: WaitBlk_cong)
   show ?case
     using a combine_blocks_wait2(7) by auto
 next
   case (combine_blocks_wait3 comms t1 t2 hist1 rdy1 blks1 blks2 blks rdy2 hist hist2 rdy)
-  have a: "d = ereal t2" "d = t1"
+  have a: "d =  t2" "d = t1"
     using combine_blocks_wait3(2,3) by (auto simp add: WaitBlk_cong)
   show ?case
     using a combine_blocks_wait3(7) by auto
@@ -1871,7 +1901,7 @@ lemma combine_blocks_waitE3 [sync_elims]:
            combine_blocks comms tr1 (WaitBlk (d2 - d1) (\<lambda>t. p2 (t + d1)) rdy2 # tr2) tr' \<Longrightarrow> P) \<Longrightarrow> P"
 proof (induct rule: combine_blocks.cases)
   case (combine_blocks_wait1 comms blks1 blks2 blks rdy1 rdy2 hist hist1 hist2 rdy t)
-  have a: "t = ereal d1" "t = d2"
+  have a: "t =  d1" "t = d2"
     using combine_blocks_wait1(2,3) WaitBlk_cong by blast+
   then show ?case
     using combine_blocks_wait1(10) by auto
@@ -1886,15 +1916,15 @@ next
     using WaitBlk_split[OF a2] combine_blocks_wait2 by auto
   have b: "WaitBlk d1 (\<lambda>t. ParState (p1 t) (p2 t)) (merge_rdy rdy1 rdy2) =
            WaitBlk t1 (\<lambda>t. ParState (hist1 t) (hist2 t)) (merge_rdy rdy1' rdy2')"
-    apply (rule WaitBlk_eq_combine)
-    using combine_blocks_wait2.hyps(2) a(1,4) a3 by auto
+    using combine_blocks_wait2.hyps(2) a(1,4) a3
+    by (smt (verit, best) WaitBlk_eqE WaitBlk_eqI list.inject)
   show ?case
     apply (rule combine_blocks_wait2) unfolding a3 b
     using combine_blocks_wait2(4) unfolding combine_blocks_wait2(9,10)
     by (auto simp add: a combine_blocks_wait2(1,5))
 next
   case (combine_blocks_wait3 comms t1 t2 hist1 rdy1 blks1 blks2 blks rdy2 hist hist2 rdy)
-  have "ereal d1 = t1" "d2 = ereal t2"
+  have " d1 = t1" "d2 =  t2"
     using combine_blocks_wait3(2,3) by (auto simp add: WaitBlk_cong)
   then show ?case
     using combine_blocks_wait3(7,12) by auto
@@ -1908,13 +1938,13 @@ lemma combine_blocks_waitE4 [sync_elims]:
            combine_blocks comms (WaitBlk (d1 - d2) (\<lambda>t. p1 (t + d2)) rdy1 # tr1) tr2 tr' \<Longrightarrow> P) \<Longrightarrow> P"
 proof (induct rule: combine_blocks.cases)
   case (combine_blocks_wait1 comms blks1 blks2 blks rdy1 rdy2 hist hist1 hist2 rdy t)
-  have "d1 = t" "ereal d2 = t"
+  have "d1 = t" " d2 = t"
     using combine_blocks_wait1(2,3) by (auto simp add: WaitBlk_cong)
   then show ?case
     using combine_blocks_wait1(10) by auto
 next
   case (combine_blocks_wait2 comms blks1 t2 t1 hist2 rdy2 blks2 blks rdy1 hist hist1 rdy)
-  have "d1 = ereal t1" "ereal d2 = t2"
+  have "d1 =  t1" " d2 = t2"
     using combine_blocks_wait2(2,3) by (auto simp add: WaitBlk_cong)
   then show ?case
     using combine_blocks_wait2(7,12) by auto
@@ -1930,8 +1960,8 @@ next
     using WaitBlk_split[OF a2] combine_blocks_wait3 by auto
   have b: "WaitBlk d2 (\<lambda>t. ParState (p1 t) (p2 t)) (merge_rdy rdy1 rdy2) =
            WaitBlk d2 (\<lambda>t. ParState (hist1 t) (hist2 t)) (merge_rdy rdy1' rdy2')"
-    apply (rule WaitBlk_eq_combine)
-    using combine_blocks_wait3 a(2,3) a3 by auto
+    using combine_blocks_wait3 a(2,3) a3
+    by (smt (verit, best) WaitBlk_eqE WaitBlk_eqI list.inject)
   show ?case
     apply (rule combine_blocks_wait3) unfolding a3 b
     using combine_blocks_wait3(4) unfolding combine_blocks_wait3(9,10)

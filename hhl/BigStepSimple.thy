@@ -64,8 +64,7 @@ theorem Valid_assume:
 
 theorem Valid_send:
   "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. Q s (tr @ [OutBlock ch (e s)]) \<and>
-              (\<forall>d::real>0. Q s (tr @ [WaitBlk d (\<lambda>_. State s) ({ch}, {}), OutBlock ch (e s)])) \<and>
-              Q s (tr @ [WaitBlk \<infinity> (\<lambda>_. State s) ({ch}, {})])}
+              (\<forall>d::real>0. Q s (tr @ [WaitBlk d (\<lambda>_. State s) ({ch}, {}), OutBlock ch (e s)]))}
        Cm (ch[!]e) {Q}"
   unfolding Valid_def
   by (auto elim: sendE)
@@ -73,8 +72,7 @@ theorem Valid_send:
 theorem Valid_receive:
   "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. (\<forall>v. Q (s(var := v)) (tr @ [InBlock ch v])) \<and>
               (\<forall>d::real>0. \<forall>v. Q (s(var := v))
-                (tr @ [WaitBlk d (\<lambda>_. State s) ({}, {ch}), InBlock ch v])) \<and>
-              Q s (tr @ [WaitBlk \<infinity> (\<lambda>_. State s) ({}, {ch})])}
+                (tr @ [WaitBlk d (\<lambda>_. State s) ({}, {ch}), InBlock ch v]))}
        Cm (ch[?]var) {Q}"
   unfolding Valid_def
   by (auto elim: receiveE)
@@ -159,13 +157,11 @@ definition pure_assn :: "bool \<Rightarrow> tassn" ("\<up>") where
 
 inductive out_assn :: "gstate \<Rightarrow> cname \<Rightarrow> real \<Rightarrow> tassn" ("Out\<^sub>t") where
   "Out\<^sub>t s ch v [OutBlock ch v]"
-| "(d::real) > 0 \<Longrightarrow> Out\<^sub>t s ch v [WaitBlk (ereal d) (\<lambda>_. s) ({ch}, {}), OutBlock ch v]"
-| "Out\<^sub>t s ch v [WaitBlk \<infinity> (\<lambda>_. s) ({ch}, {})]"
+| "(d::real) > 0 \<Longrightarrow> Out\<^sub>t s ch v [WaitBlk d (\<lambda>_. s) ({ch}, {}), OutBlock ch v]"
 
 inductive in_assn :: "gstate \<Rightarrow> cname \<Rightarrow> real \<Rightarrow> tassn" ("In\<^sub>t") where
   "In\<^sub>t s ch v [InBlock ch v]"
-| "(d::real) > 0 \<Longrightarrow> In\<^sub>t s ch v [WaitBlk (ereal d) (\<lambda>_. s) ({}, {ch}), InBlock ch v]"
-| "In\<^sub>t s ch v [WaitBlk \<infinity> (\<lambda>_. s) ({}, {ch})]"
+| "(d::real) > 0 \<Longrightarrow> In\<^sub>t s ch v [WaitBlk d (\<lambda>_. s) ({}, {ch}), InBlock ch v]"
 
 inductive io_assn :: "cname \<Rightarrow> real \<Rightarrow> tassn" ("IO\<^sub>t") where
   "IO\<^sub>t ch v [IOBlock ch v]"
@@ -259,7 +255,7 @@ inductive ode_inv_assn :: "(state \<Rightarrow> bool) \<Rightarrow> tassn" where
 
 inductive_cases ode_inv_assn_elim: "ode_inv_assn f tr"
 
-lemma ode_inv_assn_implie: "ode_inv_assn c [WaitBlk (ereal d) (\<lambda>\<tau>. State (p \<tau>)) ({}, {})] \<Longrightarrow>
+lemma ode_inv_assn_implie: "ode_inv_assn c [WaitBlk d (\<lambda>\<tau>. State (p \<tau>)) ({}, {})] \<Longrightarrow>
        \<forall>t\<in>{0..d}. c (p t)"
   apply (elim ode_inv_assn_elim)
   apply auto
@@ -341,11 +337,6 @@ theorem Valid_receive_sp:
     apply (auto simp add: conj_assn_def pure_assn_def)
     apply (rule exI[where x=tr])
     apply auto apply (rule in_assn.intros) by auto
-  subgoal for s tr
-    apply (rule exI[where x="s var"])
-    apply (auto simp add: conj_assn_def pure_assn_def)
-    apply (rule exI[where x=tr])
-    apply auto by (rule in_assn.intros)
   done
 
 theorem Valid_assume_sp:
@@ -418,10 +409,6 @@ theorem Valid_receive_sp_st:
     apply (rule exI[where x=v])
     apply auto apply (rule exI[where x=tr])
     using in_assn.intros(2) by auto
-  subgoal for tr
-    apply (rule exI[where x="st var"])
-    apply auto apply (rule exI[where x=tr])
-    by (metis in_assn.intros(3) infinity_ereal_def)
   done
 
 theorem Valid_receive_sp_bst:
