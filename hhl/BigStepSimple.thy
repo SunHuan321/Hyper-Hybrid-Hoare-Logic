@@ -77,6 +77,13 @@ theorem Valid_receive:
   unfolding Valid_def
   by (auto elim: receiveE)
 
+theorem Valid_wait:
+  "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s tr. if e s > 0 then 
+                Q s (tr @ [WaitBlk (e s) (\<lambda>_. State s) ({}, {})])
+              else Q s tr} Wait e {Q}"
+  unfolding Valid_def
+  by (auto elim: waitE)
+
 theorem Valid_seq:
   "\<Turnstile>\<^sub>H\<^sub>L {P} c1 {Q} \<Longrightarrow> \<Turnstile>\<^sub>H\<^sub>L {Q} c2 {R} \<Longrightarrow> \<Turnstile>\<^sub>H\<^sub>L {P} c1; c2 {R}"
   unfolding Valid_def
@@ -285,6 +292,16 @@ theorem Valid_receive':
   unfolding entails_def magic_wand_assn_def all_assn_def
   by (metis fun_upd_triv in_assn.intros)
 
+theorem Valid_wait':
+  "\<Turnstile>\<^sub>H\<^sub>L
+    {\<lambda>s. if e s > 0 then Wait\<^sub>t (e s) (\<lambda>_. State s) ({}, {}) @- Q s else Q s}
+      Wait e
+    {Q}"
+  apply (rule Valid_weaken_pre)
+   prefer 2 apply (rule Valid_wait)
+  unfolding entails_def magic_wand_assn_def
+  by (auto intro: wait_assn.intros)
+
 text \<open>Strongest postcondition forms\<close>
 
 theorem Valid_assign_sp:
@@ -338,6 +355,14 @@ theorem Valid_receive_sp:
     apply (rule exI[where x=tr])
     apply auto apply (rule in_assn.intros) by auto
   done
+
+theorem Valid_wait_sp:
+  "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s t. P s t}
+      Wait e
+     {\<lambda>s t. (P s @\<^sub>t (if e s > 0 then Wait\<^sub>t (e s) (\<lambda>_. State s) ({}, {}) else emp\<^sub>t)) t}"
+  apply (rule Valid_weaken_pre)
+   prefer 2 apply (rule Valid_wait')
+  by (auto simp add: entails_def join_assn_def magic_wand_assn_def emp_assn_def)
 
 theorem Valid_assume_sp:
    "\<Turnstile>\<^sub>H\<^sub>L {\<lambda>s t. P s t} Assume b {\<lambda>s t. b s \<and> P s t}"
@@ -427,12 +452,16 @@ theorem Valid_receive_sp_bst:
     apply (rule exI[where x=v])
     apply auto apply (rule exI[where x=tr])
     using in_assn.intros(2) by auto
-  subgoal for tr
-    apply (rule exI[where x="st var"])
-    apply auto apply (rule exI[where x=tr])
-    by (metis in_assn.intros(3) infinity_ereal_def)
   done
 
+theorem Valid_wait_sp_st:
+  "\<Turnstile>\<^sub>H\<^sub>L
+    {\<lambda>s tr. s = st \<and> P s tr}
+      Wait e
+    {\<lambda>s tr. s = st \<and> (P s @\<^sub>t (if e s > 0 then Wait\<^sub>t (e s) (\<lambda>_. State st) ({}, {}) else emp\<^sub>t)) tr}"
+  apply (rule Valid_weaken_pre)
+   prefer 2 apply (rule Valid_wait')
+  by (auto simp add: entails_def join_assn_def magic_wand_assn_def emp_assn_def)
 
 subsection \<open>Rules for internal and external choice\<close>
 

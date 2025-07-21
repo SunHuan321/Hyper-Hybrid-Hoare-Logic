@@ -117,6 +117,7 @@ lemma WaitBlk_eqI:
 
 type_synonym trace = "trace_block list"
 
+
 subsection \<open>Big-step semantics for the single process\<close>
 
 text \<open>Compute list of ready communications for an external choice.\<close>
@@ -210,7 +211,328 @@ inductive_cases waitE: "big_step (Wait d) s1 tr s2"
 inductive_cases echoiceE: "big_step (EChoice es) s1 tr s2"
 inductive_cases ichoiceE: "big_step (IChoice p1 p2) s1 tr s2"
 inductive_cases contE: "big_step (Cont ode b) s1 tr s2"
+inductive_cases RepE: "big_step (Rep C) s1 tr s2"
 inductive_cases interruptE: "big_step (Interrupt ode b cs) s1 tr s2"
+
+subsection \<open>Combining two traces\<close>
+
+text \<open>Whether two rdy_infos from different processes are compatible.\<close>
+fun compat_rdy :: "rdy_info \<Rightarrow> rdy_info \<Rightarrow> bool" where
+  "compat_rdy (r11, r12) (r21, r22) = (r11 \<inter> r22 = {} \<and> r12 \<inter> r21 = {})"
+
+lemma compat_rdy_symmetric: "compat_rdy rdy1 rdy2 \<Longrightarrow> compat_rdy rdy2 rdy1"
+  by (metis compat_rdy.simps inf_commute prod.collapse)
+
+text \<open>Merge two rdy infos\<close>
+fun merge_rdy :: "rdy_info \<Rightarrow> rdy_info \<Rightarrow> rdy_info" where
+  "merge_rdy (r11, r12) (r21, r22) = (r11 \<union> r21, r12 \<union> r22)"
+
+lemma WaitBlk_eq_combine:
+  assumes "WaitBlk d1 p1 rdy1 = WaitBlk d1' p1' rdy1'"
+    and "WaitBlk d1 p2 rdy2 = WaitBlk d1' p2' rdy2'"
+   shows "WaitBlk d1 (\<lambda>\<tau>. ParState (p1 \<tau>) (p2 \<tau>)) (merge_rdy rdy1 rdy2) =
+          WaitBlk d1' (\<lambda>\<tau>. ParState (p1' \<tau>) (p2' \<tau>)) (merge_rdy rdy1' rdy2')"
+proof -
+  have a1: "d1 = d1'" "rdy1 = rdy1'" "rdy2 = rdy2'"
+    using assms WaitBlk_cong by blast+
+  have a2: "\<And>t. 0 \<le> t \<Longrightarrow> t \<le> d1 \<Longrightarrow> p1 t = p1' t"
+    using assms(1) WaitBlk_cong2 by auto
+  have a3: "\<And>t. 0 \<le> t \<Longrightarrow> t \<le> d1 \<Longrightarrow> p2 t = p2' t"
+    using assms(2) WaitBlk_cong2 by auto
+  show ?thesis
+    using WaitBlk_ext_real a1(1) a1(2) a1(3) a2 a3 by presburger
+qed
+
+
+text \<open>combine_blocks comms tr1 tr2 tr means tr1 and tr2 combines to tr, where
+comms is the list of internal communication channels.\<close>
+inductive combine_blocks :: "cname set \<Rightarrow> trace \<Rightarrow> trace \<Rightarrow> trace \<Rightarrow> bool" where
+  \<comment> \<open>Empty case\<close>
+  combine_blocks_empty:
+  "combine_blocks comms [] [] []"
+
+  \<comment> \<open>Paired communication\<close>
+| combine_blocks_pair1:
+  "ch \<in> comms \<Longrightarrow>
+   combine_blocks comms blks1 blks2 blks \<Longrightarrow>
+   combine_blocks comms (InBlock ch v # blks1) (OutBlock ch v # blks2) (IOBlock ch v # blks)"
+| combine_blocks_pair2:
+  "ch \<in> comms \<Longrightarrow>
+   combine_blocks comms blks1 blks2 blks \<Longrightarrow>
+   combine_blocks comms (OutBlock ch v # blks1) (InBlock ch v # blks2) (IOBlock ch v # blks)"
+
+  \<comment> \<open>Unpaired communication\<close>
+| combine_blocks_unpair1:
+  "ch \<notin> comms \<Longrightarrow>
+   combine_blocks comms blks1 blks2 blks \<Longrightarrow>
+   combine_blocks comms (CommBlock ch_type ch v # blks1) blks2 (CommBlock ch_type ch v # blks)"
+| combine_blocks_unpair2:
+  "ch \<notin> comms \<Longrightarrow>
+   combine_blocks comms blks1 blks2 blks \<Longrightarrow>
+   combine_blocks comms blks1 (CommBlock ch_type ch v # blks2) (CommBlock ch_type ch v # blks)"
+
+  \<comment> \<open>Wait\<close>
+| combine_blocks_wait1:
+  "combine_blocks comms blks1 blks2 blks \<Longrightarrow>
+   compat_rdy rdy1 rdy2 \<Longrightarrow>
+   hist = (\<lambda>\<tau>. ParState ((\<lambda>x::real. hist1 x) \<tau>) ((\<lambda>x::real. hist2 x) \<tau>)) \<Longrightarrow>
+   rdy = merge_rdy rdy1 rdy2 \<Longrightarrow>
+   combine_blocks comms (WaitBlk t (\<lambda>x::real. hist1 x) rdy1 # blks1)
+                        (WaitBlk t (\<lambda>x::real. hist2 x) rdy2 # blks2)
+                        (WaitBlk t hist rdy # blks)"
+| combine_blocks_wait2:
+  "combine_blocks comms blks1 (WaitBlk (t2 - t1) (\<lambda>\<tau>. (\<lambda>x::real. hist2 x) (\<tau> + t1)) rdy2 # blks2) blks \<Longrightarrow>
+   compat_rdy rdy1 rdy2 \<Longrightarrow>
+   t1 < t2 \<Longrightarrow> t1 > 0 \<Longrightarrow>
+   hist = (\<lambda>\<tau>. ParState ((\<lambda>x::real. hist1 x) \<tau>) ((\<lambda>x::real. hist2 x) \<tau>)) \<Longrightarrow>
+   rdy = merge_rdy rdy1 rdy2 \<Longrightarrow>
+   combine_blocks comms (WaitBlk t1 (\<lambda>x::real. hist1 x) rdy1 # blks1)
+                        (WaitBlk t2 (\<lambda>x::real. hist2 x) rdy2 # blks2)
+                        (WaitBlk t1 hist rdy # blks)"
+| combine_blocks_wait3:
+  "combine_blocks comms (WaitBlk (t1 - t2) (\<lambda>\<tau>. (\<lambda>x::real. hist1 x) (\<tau> + t2)) rdy1 # blks1) blks2 blks \<Longrightarrow>
+   compat_rdy rdy1 rdy2 \<Longrightarrow>
+   t1 > t2 \<Longrightarrow> t2 > 0 \<Longrightarrow>
+   hist = (\<lambda>\<tau>. ParState ((\<lambda>x::real. hist1 x) \<tau>) ((\<lambda>x::real. hist2 x) \<tau>)) \<Longrightarrow>
+   rdy = merge_rdy rdy1 rdy2 \<Longrightarrow>
+   combine_blocks comms (WaitBlk t1 (\<lambda>x::real. hist1 x) rdy1 # blks1)
+                        (WaitBlk t2 (\<lambda>x::real. hist2 x) rdy2 # blks2)
+                        (WaitBlk t2 hist rdy # blks)"
+
+inductive par_big_step :: "pproc \<Rightarrow> gstate \<Rightarrow> trace \<Rightarrow> gstate \<Rightarrow> bool" where
+  SingleB: "big_step p s1 tr s2 \<Longrightarrow> par_big_step (Single p) (State s1) tr (State s2)"
+| ParallelB:
+    "par_big_step p1 s11 tr1 s12 \<Longrightarrow>
+     par_big_step p2 s21 tr2 s22 \<Longrightarrow>
+     combine_blocks chs tr1 tr2 tr \<Longrightarrow>
+     par_big_step (Parallel p1 chs p2) (ParState s11 s21) tr (ParState s12 s22)"
+
+inductive_cases combineE: "combine_blocks chs tr1 tr2 tr3"
+inductive_cases SingleE: "par_big_step (Single p) s1 tr s2"
+inductive_cases ParallelE: "par_big_step (Parallel p1 ch p2) s1 tr s2"
+
+subsection \<open>Elimination rules for synchronization\<close>
+
+named_theorems sync_elims
+
+lemma combine_blocks_pairE [sync_elims]:
+  "combine_blocks comms (CommBlock ch_type1 ch1 v1 # tr1) (CommBlock ch_type2 ch2 v2 # tr2) tr \<Longrightarrow>
+   ch1 \<in> comms \<Longrightarrow> ch2 \<in> comms \<Longrightarrow>
+   (\<And>tr'. ch1 = ch2 \<Longrightarrow> v1 = v2 \<Longrightarrow> (ch_type1 = In \<and> ch_type2 = Out \<or> ch_type1 = Out \<and> ch_type2 = In) \<Longrightarrow>
+   tr = IOBlock ch1 v1 # tr' \<Longrightarrow> combine_blocks comms tr1 tr2 tr' \<Longrightarrow> P) \<Longrightarrow> P"
+  by (induct rule: combine_blocks.cases, auto)
+
+lemma combine_blocks_unpairE1 [sync_elims]:
+  "combine_blocks comms (CommBlock ch_type1 ch1 v1 # tr1) (CommBlock ch_type2 ch2 v2 # tr2) tr \<Longrightarrow>
+   ch1 \<notin> comms \<Longrightarrow> ch2 \<in> comms \<Longrightarrow>
+   (\<And>tr'. tr = CommBlock ch_type1 ch1 v1 # tr' \<Longrightarrow>
+           combine_blocks comms tr1 (CommBlock ch_type2 ch2 v2 # tr2) tr' \<Longrightarrow> P) \<Longrightarrow> P"
+  by (induct rule: combine_blocks.cases, auto)
+
+lemma combine_blocks_unpairE1' [sync_elims]:
+  "combine_blocks comms (CommBlock ch_type1 ch1 v1 # tr1) (CommBlock ch_type2 ch2 v2 # tr2) tr \<Longrightarrow>
+   ch1 \<in> comms \<Longrightarrow> ch2 \<notin> comms \<Longrightarrow>
+   (\<And>tr'. tr = CommBlock ch_type2 ch2 v2 # tr' \<Longrightarrow>
+           combine_blocks comms (CommBlock ch_type1 ch1 v1 # tr1) tr2 tr' \<Longrightarrow> P) \<Longrightarrow> P"
+  by (induct rule: combine_blocks.cases, auto)
+
+lemma combine_blocks_unpairE2 [sync_elims]:
+  "combine_blocks comms (CommBlock ch_type1 ch1 v1 # tr1) (CommBlock ch_type2 ch2 v2 # tr2) tr \<Longrightarrow>
+   ch1 \<notin> comms \<Longrightarrow> ch2 \<notin> comms \<Longrightarrow>
+   (\<And>tr'. tr = CommBlock ch_type1 ch1 v1 # tr' \<Longrightarrow>
+           combine_blocks comms tr1 (CommBlock ch_type2 ch2 v2 # tr2) tr' \<Longrightarrow> P) \<Longrightarrow>
+   (\<And>tr'. tr = CommBlock ch_type2 ch2 v2 # tr' \<Longrightarrow>
+           combine_blocks comms (CommBlock ch_type1 ch1 v1 # tr1) tr2 tr' \<Longrightarrow> P) \<Longrightarrow> P"
+  by (induct rule: combine_blocks.cases, auto)
+
+lemma combine_blocks_pairE2 [sync_elims]:
+  "combine_blocks comms (CommBlock ch_type1 ch1 v1 # tr1) (WaitBlk d2 p2 rdy2 # tr2) tr \<Longrightarrow>
+   ch1 \<in> comms \<Longrightarrow> P"
+  by (induct rule: combine_blocks.cases, auto)
+
+lemma combine_blocks_pairE2' [sync_elims]:
+  "combine_blocks comms (WaitBlk d1 p1 rdy1 # tr1) (CommBlock ch_type2 ch2 v2 # tr2) tr \<Longrightarrow>
+   ch2 \<in> comms \<Longrightarrow> P"
+  by (induct rule: combine_blocks.cases, auto)
+
+lemma combine_blocks_unpairE3 [sync_elims]:
+  "combine_blocks comms (CommBlock ch_type1 ch1 v1 # tr1) (WaitBlk d2 p2 rdy2 # tr2) tr \<Longrightarrow>
+   ch1 \<notin> comms \<Longrightarrow>
+   (\<And>tr'. tr = CommBlock ch_type1 ch1 v1 # tr' \<Longrightarrow>
+           combine_blocks comms tr1 (WaitBlk d2 p2 rdy2 # tr2) tr' \<Longrightarrow> P) \<Longrightarrow> P"
+  by (induct rule: combine_blocks.cases, auto)
+
+lemma combine_blocks_unpairE3' [sync_elims]:
+  "combine_blocks comms (WaitBlk d1 p1 rdy1 # tr1) (CommBlock ch_type2 ch2 v2 # tr2) tr \<Longrightarrow>
+   ch2 \<notin> comms \<Longrightarrow>
+   (\<And>tr'. tr = CommBlock ch_type2 ch2 v2 # tr' \<Longrightarrow>
+           combine_blocks comms (WaitBlk d1 p1 rdy1 # tr1) tr2 tr' \<Longrightarrow> P) \<Longrightarrow> P"
+  by (induct rule: combine_blocks.cases, auto)
+
+lemma combine_blocks_waitE1 [sync_elims]:
+  "combine_blocks comms (WaitBlk d1 p1 rdy1 # tr1) (WaitBlk d2 p2 rdy2 # tr2) tr \<Longrightarrow>
+   \<not>compat_rdy rdy1 rdy2 \<Longrightarrow> P"
+  by (induct rule: combine_blocks.cases, auto elim: WaitBlk_eqE)
+
+lemma combine_blocks_waitE2 [sync_elims]:
+  "combine_blocks comms (WaitBlk d (\<lambda>t. p1 t) rdy1 # tr1) (WaitBlk d (\<lambda>t. p2 t) rdy2 # tr2) tr \<Longrightarrow>
+   compat_rdy rdy1 rdy2 \<Longrightarrow>
+   (\<And>tr'. tr = WaitBlk d (\<lambda>t. ParState (p1 t) (p2 t)) (merge_rdy rdy1 rdy2) # tr' \<Longrightarrow>
+           combine_blocks comms tr1 tr2 tr' \<Longrightarrow> P) \<Longrightarrow> P"
+  apply (induct rule: combine_blocks.cases, auto elim: WaitBlk_eqE)
+  subgoal premises pre for blks a b a' b' hist1 hist2 t
+    apply (rule pre(6)) apply (rule WaitBlk_eqI)
+    using pre by (auto elim!: WaitBlk_eqE)
+  done
+
+lemma combine_blocks_waitE2':
+  "combine_blocks comms (WaitBlk d1 (\<lambda>t. p1 t) rdy1 # tr1) (WaitBlk d2 (\<lambda>t. p2 t) rdy2 # tr2) tr \<Longrightarrow>
+   d1 = d2 \<Longrightarrow>
+   compat_rdy rdy1 rdy2 \<Longrightarrow>
+   (\<And>tr'. tr = WaitBlk d2 (\<lambda>t. ParState (p1 t) (p2 t)) (merge_rdy rdy1 rdy2) # tr' \<Longrightarrow>
+           combine_blocks comms tr1 tr2 tr' \<Longrightarrow> P) \<Longrightarrow> P"
+  apply (induct rule: combine_blocks.cases, auto elim: WaitBlk_eqE)
+  subgoal premises pre for blks a b a' b' hist1 hist2 t
+    apply (rule pre(7)) apply (rule WaitBlk_eqI)
+    using pre by (auto elim!: WaitBlk_eqE)
+  done
+
+lemma combine_blocks_waitE3 [sync_elims]:
+  "combine_blocks comms (WaitBlk d1 (\<lambda>t. p1 t) rdy1 # tr1) (WaitBlk d2 (\<lambda>t. p2 t) rdy2 # tr2) tr \<Longrightarrow>
+   0 < d1 \<Longrightarrow> d1 < d2 \<Longrightarrow>
+   compat_rdy rdy1 rdy2 \<Longrightarrow>
+   (\<And>tr'. tr = WaitBlk d1 (\<lambda>t. ParState (p1 t) (p2 t)) (merge_rdy rdy1 rdy2) # tr' \<Longrightarrow>
+           combine_blocks comms tr1 (WaitBlk (d2 - d1) (\<lambda>t. p2 (t + d1)) rdy2 # tr2) tr' \<Longrightarrow> P) \<Longrightarrow> P"
+  apply (induct rule: combine_blocks.cases, auto elim!: WaitBlk_eqE)
+  subgoal premises pre for hist2 a b blks a' b' hist1
+    apply (rule pre(5)) apply (rule WaitBlk_eqI)
+    using pre apply (auto elim!: WaitBlk_eqE)
+    subgoal proof -
+      have "WaitBlk (d2 - d1) (\<lambda>\<tau>. hist2 (\<tau> + d1)) (a, b) = WaitBlk (d2 - d1) (\<lambda>\<tau>. p2 (\<tau> + d1)) (a, b)"
+        apply (rule WaitBlk_eqI) using pre by (auto elim!: WaitBlk_eqE)
+      then show ?thesis
+        using pre by auto
+    qed
+    done
+  done
+
+lemma combine_blocks_waitE4 [sync_elims]:
+  "combine_blocks comms (WaitBlk d1 (\<lambda>t. p1 t) rdy1 # tr1) (WaitBlk d2 (\<lambda>t. p2 t) rdy2 # tr2) tr \<Longrightarrow>
+   0 < d2 \<Longrightarrow> d2 < d1 \<Longrightarrow>
+   compat_rdy rdy1 rdy2 \<Longrightarrow>
+   (\<And>tr'. tr = WaitBlk d2 (\<lambda>t. ParState (p1 t) (p2 t)) (merge_rdy rdy1 rdy2) # tr' \<Longrightarrow>
+           combine_blocks comms (WaitBlk (d1 - d2) (\<lambda>t. p1 (t + d2)) rdy1 # tr1) tr2 tr' \<Longrightarrow> P) \<Longrightarrow> P"
+  apply (induct rule: combine_blocks.cases, auto elim!: WaitBlk_eqE)
+  subgoal premises pre for hist2 a b blks a' b' hist1
+    apply (rule pre(5)) apply (rule WaitBlk_eqI)
+    using pre apply (auto elim!: WaitBlk_eqE)
+    subgoal proof -
+      have "WaitBlk (d1 - d2) (\<lambda>\<tau>. hist2 (\<tau> + d2)) (a, b) = WaitBlk (d1 - d2) (\<lambda>\<tau>. p1 (\<tau> + d2)) (a, b)"
+        apply (rule WaitBlk_eqI) using pre by (auto elim!: WaitBlk_eqE)
+      then show ?thesis
+        using pre by auto
+    qed
+    done
+  done
+
+lemma combine_blocks_waitE5 [sync_elims]:
+  "combine_blocks comms (WaitBlk d1 p1 rdy1 # CommBlock ch_type1 ch1 v1 # tr1) 
+  (WaitBlk d2 p2 rdy2 # CommBlock ch_type2 ch2 v2 # tr2) tr \<Longrightarrow> ch1 \<in> comms \<Longrightarrow> ch2 \<in> comms \<Longrightarrow>
+  (\<And>tr'. ch1 = ch2 \<Longrightarrow> v1 = v2 \<Longrightarrow> d1 = d2 \<Longrightarrow> compat_rdy rdy1 rdy2  \<Longrightarrow>
+   (ch_type1 = In \<and> ch_type2 = Out \<or> ch_type1 = Out \<and> ch_type2 = In) 
+   \<Longrightarrow> tr = WaitBlk d1 (\<lambda>t. ParState (p1 t) (p2 t)) (merge_rdy rdy1 rdy2) # IOBlock ch1 v1 # tr' \<Longrightarrow>
+   combine_blocks comms tr1 tr2 tr' \<Longrightarrow> P)  \<Longrightarrow> P"
+proof (induct rule: combine_blocks.cases, auto elim!: WaitBlk_eqE)
+  fix hist2 a b blks a' b' hist1
+  assume a0: "tr = WaitBlk d1 (\<lambda>\<tau>. ParState (hist1 \<tau>) (hist2 \<tau>)) (a \<union> a', b \<union> b') # blks"
+     and a1: "combine_blocks comms (CommBlock ch_type1 ch1 v1 # tr1) (CommBlock ch_type2 ch2 v2 # tr2) blks"
+     and a2: "ch1 \<in> comms" "ch2 \<in> comms"
+     and a3: "(\<And>tr'. ch1 = ch2 \<Longrightarrow> v1 = v2 \<Longrightarrow> ch_type1 = In \<and> ch_type2 = Out \<or> ch_type1 = Out \<and> ch_type2 = In 
+     \<Longrightarrow> WaitBlk d1 (\<lambda>\<tau>. ParState (hist1 \<tau>) (hist2 \<tau>)) (a \<union> a', b \<union> b') = 
+         WaitBlk d1 (\<lambda>t. ParState (p1 t) (p2 t)) (a \<union> a', b \<union> b') \<and> blks = IOBlock ch2 v2 # tr' \<Longrightarrow>
+         combine_blocks comms tr1 tr2 tr' \<Longrightarrow> P)"
+     and a4: "\<forall>t. 0 \<le> t \<and> t \<le> d1 \<longrightarrow> p1 t = hist1 t" " \<forall>t. 0 \<le> t \<and> t \<le> d1 \<longrightarrow> p2 t = hist2 t"
+  then obtain tr' where "ch1 = ch2" "v1 = v2" "ch_type1 = In \<and> ch_type2 = Out \<or> ch_type1 = Out \<and> ch_type2 = In"
+  "blks = IOBlock ch1 v1 # tr'" "combine_blocks comms tr1 tr2 tr'"
+    using combine_blocks_pairE[of comms ch_type1 ch1 v1 tr1 ch_type2 ch2 v2 tr2 blks] by blast
+  with a4 show ?thesis
+    apply (rule_tac a3, simp_all)
+    using WaitBlk_ext_real by presburger
+next
+  fix hist2 a b blks a' b' hist1
+  assume "combine_blocks comms (CommBlock ch_type1 ch1 v1 # tr1) 
+          (WaitBlk (d2 - d1) (\<lambda>\<tau>. hist2 (\<tau> + d1)) (a, b) # CommBlock ch_type2 ch2 v2 # tr2) blks"
+         "ch1 \<in> comms"
+  then show ?thesis
+    using combine_blocks_pairE2[of comms ch_type1 ch1 v1 tr1 "d2 - d1" "\<lambda>\<tau>. hist2 (\<tau> + d1)"
+    "(a, b)" "CommBlock ch_type2 ch2 v2 # tr2" blks] by auto
+next
+  fix hist1 a b blks a' b' hist2
+  assume "combine_blocks comms (WaitBlk (d1 - d2) (\<lambda>\<tau>. hist1 (\<tau> + d2)) (a, b) # CommBlock ch_type1 ch1 v1 # tr1) 
+         (CommBlock ch_type2 ch2 v2 # tr2) blks" "ch2 \<in> comms"
+  then show ?thesis
+    using combine_blocks_pairE2'[of comms "d1 - d2" "\<lambda>\<tau>. hist1 (\<tau> + d2)" "(a, b)" "CommBlock ch_type1 ch1 v1 # tr1"
+    ch_type2 ch2 v2 tr2 blks] by auto
+qed
+
+lemma combine_blocks_emptyE1 [sync_elims]:
+  "combine_blocks comms [] [] tr \<Longrightarrow> tr = []"
+  by (induct rule: combine_blocks.cases, auto)
+
+lemma combine_blocks_emptyE2 [sync_elims]:
+  "combine_blocks comms (WaitBlk d1 p1 rdy1 # tr1) [] tr \<Longrightarrow> P"
+  by (induct rule: combine_blocks.cases, auto)
+
+lemma combine_blocks_emptyE2' [sync_elims]:
+  "combine_blocks comms [] (WaitBlk d2 p2 rdy2 # tr2) tr \<Longrightarrow> P"
+  by (induct rule: combine_blocks.cases, auto)
+
+lemma combine_blocks_emptyE3 [sync_elims]:
+  "combine_blocks comms (CommBlock ch_type1 ch1 v1 # tr1) [] tr \<Longrightarrow>
+   (\<And>tr'. ch1 \<notin> comms \<Longrightarrow> tr = CommBlock ch_type1 ch1 v1 # tr' \<Longrightarrow>
+           combine_blocks comms tr1 [] tr' \<Longrightarrow> P) \<Longrightarrow> P"
+  by (induct rule: combine_blocks.cases, auto)
+
+lemma combine_blocks_emptyE3' [sync_elims]:
+  "combine_blocks comms [] (CommBlock ch_type2 ch2 v2 # tr2) tr \<Longrightarrow>
+   (\<And>tr'. ch2 \<notin> comms \<Longrightarrow> tr = CommBlock ch_type2 ch2 v2 # tr' \<Longrightarrow>
+           combine_blocks comms [] tr2 tr' \<Longrightarrow> P) \<Longrightarrow> P"
+  by (induct rule: combine_blocks.cases, auto)
+
+lemma combine_blocks_symmetric: "combine_blocks chs tr1 tr2 tr \<Longrightarrow> \<exists>tr'. combine_blocks chs tr2 tr1 tr'"
+proof(induct rule: combine_blocks.induct)
+  case (combine_blocks_empty comms)
+  then show ?case
+    using combine_blocks.combine_blocks_empty by blast
+next
+  case (combine_blocks_pair1 ch comms blks1 blks2 blks v)
+  then show ?case
+    using combine_blocks_pair2 by blast    
+next
+  case (combine_blocks_pair2 ch comms blks1 blks2 blks v)
+  then show ?case 
+    using combine_blocks_pair1 by blast
+next
+  case (combine_blocks_unpair1 ch comms blks1 blks2 blks ch_type v)
+  then show ?case
+    using combine_blocks_unpair2 by blast
+next
+  case (combine_blocks_unpair2 ch comms blks1 blks2 blks ch_type v)
+  then show ?case
+    using combine_blocks_unpair1 by blast
+next
+  case (combine_blocks_wait1 comms blks1 blks2 blks rdy1 rdy2 hist hist1 hist2 rdy t)
+  then show ?case
+    using combine_blocks.combine_blocks_wait1 compat_rdy_symmetric by blast
+next
+  case (combine_blocks_wait2 comms blks1 t2 t1 hist2 rdy2 blks2 blks rdy1 hist hist1 rdy)
+  then show ?case
+    using combine_blocks_wait3 compat_rdy_symmetric by blast
+next
+  case (combine_blocks_wait3 comms t1 t2 hist1 rdy1 blks1 blks2 blks rdy2 hist hist2 rdy)
+  then show ?case
+    using combine_blocks_wait2 compat_rdy_symmetric by blast
+qed
 
 subsection \<open>Lemmas for Loop\<close>
 
@@ -364,365 +686,6 @@ next
   then show ?case
     by fastforce
 qed
-
-subsection \<open>Combining two traces\<close>
-
-text \<open>Whether two rdy_infos from different processes are compatible.\<close>
-fun compat_rdy :: "rdy_info \<Rightarrow> rdy_info \<Rightarrow> bool" where
-  "compat_rdy (r11, r12) (r21, r22) = (r11 \<inter> r22 = {} \<and> r12 \<inter> r21 = {})"
-
-lemma compat_rdy_symmetric: "compat_rdy rdy1 rdy2 \<Longrightarrow> compat_rdy rdy2 rdy1"
-  by (metis compat_rdy.simps inf_commute prod.collapse)
-
-text \<open>Merge two rdy infos\<close>
-fun merge_rdy :: "rdy_info \<Rightarrow> rdy_info \<Rightarrow> rdy_info" where
-  "merge_rdy (r11, r12) (r21, r22) = (r11 \<union> r21, r12 \<union> r22)"
-
-text \<open>combine_blocks comms tr1 tr2 tr means tr1 and tr2 combines to tr, where
-comms is the list of internal communication channels.\<close>
-inductive combine_blocks :: "cname set \<Rightarrow> trace \<Rightarrow> trace \<Rightarrow> trace \<Rightarrow> bool" where
-  \<comment> \<open>Empty case\<close>
-  combine_blocks_empty:
-  "combine_blocks comms [] [] []"
-
-  \<comment> \<open>Paired communication\<close>
-| combine_blocks_pair1:
-  "ch \<in> comms \<Longrightarrow>
-   combine_blocks comms blks1 blks2 blks \<Longrightarrow>
-   combine_blocks comms (InBlock ch v # blks1) (OutBlock ch v # blks2) (IOBlock ch v # blks)"
-| combine_blocks_pair2:
-  "ch \<in> comms \<Longrightarrow>
-   combine_blocks comms blks1 blks2 blks \<Longrightarrow>
-   combine_blocks comms (OutBlock ch v # blks1) (InBlock ch v # blks2) (IOBlock ch v # blks)"
-
-  \<comment> \<open>Unpaired communication\<close>
-| combine_blocks_unpair1:
-  "ch \<notin> comms \<Longrightarrow>
-   combine_blocks comms blks1 blks2 blks \<Longrightarrow>
-   combine_blocks comms (CommBlock ch_type ch v # blks1) blks2 (CommBlock ch_type ch v # blks)"
-| combine_blocks_unpair2:
-  "ch \<notin> comms \<Longrightarrow>
-   combine_blocks comms blks1 blks2 blks \<Longrightarrow>
-   combine_blocks comms blks1 (CommBlock ch_type ch v # blks2) (CommBlock ch_type ch v # blks)"
-
-  \<comment> \<open>Wait\<close>
-| combine_blocks_wait1:
-  "combine_blocks comms blks1 blks2 blks \<Longrightarrow>
-   compat_rdy rdy1 rdy2 \<Longrightarrow>
-   hist = (\<lambda>\<tau>. ParState ((\<lambda>x::real. hist1 x) \<tau>) ((\<lambda>x::real. hist2 x) \<tau>)) \<Longrightarrow>
-   rdy = merge_rdy rdy1 rdy2 \<Longrightarrow>
-   combine_blocks comms (WaitBlk t (\<lambda>x::real. hist1 x) rdy1 # blks1)
-                        (WaitBlk t (\<lambda>x::real. hist2 x) rdy2 # blks2)
-                        (WaitBlk t hist rdy # blks)"
-| combine_blocks_wait2:
-  "combine_blocks comms blks1 (WaitBlk (t2 - t1) (\<lambda>\<tau>. (\<lambda>x::real. hist2 x) (\<tau> + t1)) rdy2 # blks2) blks \<Longrightarrow>
-   compat_rdy rdy1 rdy2 \<Longrightarrow>
-   t1 < t2 \<Longrightarrow> t1 > 0 \<Longrightarrow>
-   hist = (\<lambda>\<tau>. ParState ((\<lambda>x::real. hist1 x) \<tau>) ((\<lambda>x::real. hist2 x) \<tau>)) \<Longrightarrow>
-   rdy = merge_rdy rdy1 rdy2 \<Longrightarrow>
-   combine_blocks comms (WaitBlk t1 (\<lambda>x::real. hist1 x) rdy1 # blks1)
-                        (WaitBlk t2 (\<lambda>x::real. hist2 x) rdy2 # blks2)
-                        (WaitBlk t1 hist rdy # blks)"
-| combine_blocks_wait3:
-  "combine_blocks comms (WaitBlk (t1 - t2) (\<lambda>\<tau>. (\<lambda>x::real. hist1 x) (\<tau> + t2)) rdy1 # blks1) blks2 blks \<Longrightarrow>
-   compat_rdy rdy1 rdy2 \<Longrightarrow>
-   t1 > t2 \<Longrightarrow> t2 > 0 \<Longrightarrow>
-   hist = (\<lambda>\<tau>. ParState ((\<lambda>x::real. hist1 x) \<tau>) ((\<lambda>x::real. hist2 x) \<tau>)) \<Longrightarrow>
-   rdy = merge_rdy rdy1 rdy2 \<Longrightarrow>
-   combine_blocks comms (WaitBlk t1 (\<lambda>x::real. hist1 x) rdy1 # blks1)
-                        (WaitBlk t2 (\<lambda>x::real. hist2 x) rdy2 # blks2)
-                        (WaitBlk t2 hist rdy # blks)"
-
-lemma combine_blocks_symmetric: "combine_blocks chs tr1 tr2 tr \<Longrightarrow> \<exists>tr'. combine_blocks chs tr2 tr1 tr'"
-proof(induct rule: combine_blocks.induct)
-  case (combine_blocks_empty comms)
-  then show ?case
-    using combine_blocks.combine_blocks_empty by blast
-next
-  case (combine_blocks_pair1 ch comms blks1 blks2 blks v)
-  then show ?case
-    using combine_blocks_pair2 by blast    
-next
-  case (combine_blocks_pair2 ch comms blks1 blks2 blks v)
-  then show ?case 
-    using combine_blocks_pair1 by blast
-next
-  case (combine_blocks_unpair1 ch comms blks1 blks2 blks ch_type v)
-  then show ?case
-    using combine_blocks_unpair2 by blast
-next
-  case (combine_blocks_unpair2 ch comms blks1 blks2 blks ch_type v)
-  then show ?case
-    using combine_blocks_unpair1 by blast
-next
-  case (combine_blocks_wait1 comms blks1 blks2 blks rdy1 rdy2 hist hist1 hist2 rdy t)
-  then show ?case
-    using combine_blocks.combine_blocks_wait1 compat_rdy_symmetric by blast
-next
-  case (combine_blocks_wait2 comms blks1 t2 t1 hist2 rdy2 blks2 blks rdy1 hist hist1 rdy)
-  then show ?case
-    using combine_blocks_wait3 compat_rdy_symmetric by blast
-next
-  case (combine_blocks_wait3 comms t1 t2 hist1 rdy1 blks1 blks2 blks rdy2 hist hist2 rdy)
-  then show ?case
-    using combine_blocks_wait2 compat_rdy_symmetric by blast
-qed
-
-subsection \<open>Basic elimination rules\<close>
-named_theorems sync_elims
-
-lemma combine_blocks_pairE [sync_elims]:
-  "combine_blocks comms (CommBlock ch_type1 ch1 v1 # tr1) (CommBlock ch_type2 ch2 v2 # tr2) tr \<Longrightarrow>
-   ch1 \<in> comms \<Longrightarrow> ch2 \<in> comms \<Longrightarrow>
-   (\<And>tr'. ch1 = ch2 \<Longrightarrow> v1 = v2 \<Longrightarrow> (ch_type1 = In \<and> ch_type2 = Out \<or> ch_type1 = Out \<and> ch_type2 = In) \<Longrightarrow>
-   tr = IOBlock ch1 v1 # tr' \<Longrightarrow> combine_blocks comms tr1 tr2 tr' \<Longrightarrow> P) \<Longrightarrow> P"
-  by (induct rule: combine_blocks.cases, auto)
-
-lemma combine_blocks_unpairE1 [sync_elims]:
-  "combine_blocks comms (CommBlock ch_type1 ch1 v1 # tr1) (CommBlock ch_type2 ch2 v2 # tr2) tr \<Longrightarrow>
-   ch1 \<notin> comms \<Longrightarrow> ch2 \<in> comms \<Longrightarrow>
-   (\<And>tr'. tr = CommBlock ch_type1 ch1 v1 # tr' \<Longrightarrow>
-           combine_blocks comms tr1 (CommBlock ch_type2 ch2 v2 # tr2) tr' \<Longrightarrow> P) \<Longrightarrow> P"
-  by (induct rule: combine_blocks.cases, auto)
-
-lemma combine_blocks_unpairE1' [sync_elims]:
-  "combine_blocks comms (CommBlock ch_type1 ch1 v1 # tr1) (CommBlock ch_type2 ch2 v2 # tr2) tr \<Longrightarrow>
-   ch1 \<in> comms \<Longrightarrow> ch2 \<notin> comms \<Longrightarrow>
-   (\<And>tr'. tr = CommBlock ch_type2 ch2 v2 # tr' \<Longrightarrow>
-           combine_blocks comms (CommBlock ch_type1 ch1 v1 # tr1) tr2 tr' \<Longrightarrow> P) \<Longrightarrow> P"
-  by (induct rule: combine_blocks.cases, auto)
-
-lemma combine_blocks_unpairE2 [sync_elims]:
-  "combine_blocks comms (CommBlock ch_type1 ch1 v1 # tr1) (CommBlock ch_type2 ch2 v2 # tr2) tr \<Longrightarrow>
-   ch1 \<notin> comms \<Longrightarrow> ch2 \<notin> comms \<Longrightarrow>
-   (\<And>tr'. tr = CommBlock ch_type1 ch1 v1 # tr' \<Longrightarrow>
-           combine_blocks comms tr1 (CommBlock ch_type2 ch2 v2 # tr2) tr' \<Longrightarrow> P) \<Longrightarrow>
-   (\<And>tr'. tr = CommBlock ch_type2 ch2 v2 # tr' \<Longrightarrow>
-           combine_blocks comms (CommBlock ch_type1 ch1 v1 # tr1) tr2 tr' \<Longrightarrow> P) \<Longrightarrow> P"
-  by (induct rule: combine_blocks.cases, auto)
-
-lemma combine_blocks_pairE2 [sync_elims]:
-  "combine_blocks comms (CommBlock ch_type1 ch1 v1 # tr1) (WaitBlk d2 p2 rdy2 # tr2) tr \<Longrightarrow>
-   ch1 \<in> comms \<Longrightarrow> P"
-  by (induct rule: combine_blocks.cases, auto)
-
-lemma combine_blocks_pairE2' [sync_elims]:
-  "combine_blocks comms (WaitBlk d1 p1 rdy1 # tr1) (CommBlock ch_type2 ch2 v2 # tr2) tr \<Longrightarrow>
-   ch2 \<in> comms \<Longrightarrow> P"
-  by (induct rule: combine_blocks.cases, auto)
-
-lemma combine_blocks_unpairE3 [sync_elims]:
-  "combine_blocks comms (CommBlock ch_type1 ch1 v1 # tr1) (WaitBlk d2 p2 rdy2 # tr2) tr \<Longrightarrow>
-   ch1 \<notin> comms \<Longrightarrow>
-   (\<And>tr'. tr = CommBlock ch_type1 ch1 v1 # tr' \<Longrightarrow>
-           combine_blocks comms tr1 (WaitBlk d2 p2 rdy2 # tr2) tr' \<Longrightarrow> P) \<Longrightarrow> P"
-  by (induct rule: combine_blocks.cases, auto)
-
-lemma combine_blocks_unpairE3' [sync_elims]:
-  "combine_blocks comms (WaitBlk d1 p1 rdy1 # tr1) (CommBlock ch_type2 ch2 v2 # tr2) tr \<Longrightarrow>
-   ch2 \<notin> comms \<Longrightarrow>
-   (\<And>tr'. tr = CommBlock ch_type2 ch2 v2 # tr' \<Longrightarrow>
-           combine_blocks comms (WaitBlk d1 p1 rdy1 # tr1) tr2 tr' \<Longrightarrow> P) \<Longrightarrow> P"
-  by (induct rule: combine_blocks.cases, auto)
-
-lemma combine_blocks_waitE1 [sync_elims]:
-  "combine_blocks comms (WaitBlk d1 p1 rdy1 # tr1) (WaitBlk d2 p2 rdy2 # tr2) tr \<Longrightarrow>
-   \<not>compat_rdy rdy1 rdy2 \<Longrightarrow> P"
-proof (induct rule: combine_blocks.cases)
-  case (combine_blocks_wait1 comms blks1 blks2 blks rdy1 rdy2 hist hist1 hist2 rdy t)
-  then show ?case
-    by (metis WaitBlk_cong list.inject)
-next
-  case (combine_blocks_wait2 comms blks1 t2 t1 hist2 rdy2 blks2 blks rdy1 hist hist1 rdy)
-  then show ?case 
-    by (metis WaitBlk_cong list.inject)
-next
-  case (combine_blocks_wait3 comms t1 t2 hist1 rdy1 blks1 blks2 blks rdy2 hist hist2 rdy)
-  then show ?case 
-    by (metis WaitBlk_cong list.inject)
-qed (auto)
-
-lemma combine_blocks_waitE2 [sync_elims]:
-  "combine_blocks comms (WaitBlk d p1 rdy1 # tr1) (WaitBlk d p2 rdy2 # tr2) tr \<Longrightarrow>
-   compat_rdy rdy1 rdy2 \<Longrightarrow>
-   (\<And>tr'. tr = WaitBlk d (\<lambda>t. ParState (p1 t) (p2 t)) (merge_rdy rdy1 rdy2) # tr' \<Longrightarrow>
-           combine_blocks comms tr1 tr2 tr' \<Longrightarrow> P) \<Longrightarrow> P"
-proof (induct rule: combine_blocks.cases)
-  case (combine_blocks_wait1 comms' blks1 blks2 blks rdy1' rdy2' hist hist1 hist2 rdy t)
-  have a: "d = t" "rdy1 = rdy1'" "rdy2 = rdy2'" "tr1 = blks1" "tr2 = blks2" 
-    using combine_blocks_wait1(2,3) by (auto simp add: WaitBlk_cong)
-  have b: "WaitBlk d (\<lambda>t. ParState (p1 t) (p2 t)) (merge_rdy rdy1 rdy2) =
-           WaitBlk t (\<lambda>t. ParState (hist1 t) (hist2 t)) (merge_rdy rdy1' rdy2')"
-    by (smt (verit, ccfv_SIG) WaitBlk_eqE WaitBlk_eqI combine_blocks_wait1.hyps(2,3) list.inject)
-  show ?case
-    apply (rule combine_blocks_wait1)
-    unfolding b using combine_blocks_wait1(4) unfolding a combine_blocks_wait1(7,8)
-    by (auto simp add: combine_blocks_wait1(1,5))
-next
-  case (combine_blocks_wait2 comms blks1 t2 t1 hist2 rdy2 blks2 blks rdy1 hist hist1 rdy)
-  have a: "d =  t1" "d = t2"
-    using combine_blocks_wait2(2,3) by (auto simp add: WaitBlk_cong)
-  show ?case
-    using a combine_blocks_wait2(7) by auto
-next
-  case (combine_blocks_wait3 comms t1 t2 hist1 rdy1 blks1 blks2 blks rdy2 hist hist2 rdy)
-  have a: "d =  t2" "d = t1"
-    using combine_blocks_wait3(2,3) by (auto simp add: WaitBlk_cong)
-  show ?case
-    using a combine_blocks_wait3(7) by auto
-qed (auto)
-
-lemma combine_blocks_waitE3 [sync_elims]:
-  "combine_blocks comms (WaitBlk d1 p1 rdy1 # tr1) (WaitBlk d2 p2 rdy2 # tr2) tr \<Longrightarrow>
-   0 < d1 \<Longrightarrow> d1 < d2 \<Longrightarrow>
-   compat_rdy rdy1 rdy2 \<Longrightarrow>
-   (\<And>tr'. tr = WaitBlk d1 (\<lambda>t. ParState (p1 t) (p2 t)) (merge_rdy rdy1 rdy2) # tr' \<Longrightarrow>
-           combine_blocks comms tr1 (WaitBlk (d2 - d1) (\<lambda>t. p2 (t + d1)) rdy2 # tr2) tr' \<Longrightarrow> P) \<Longrightarrow> P"
-proof (induct rule: combine_blocks.cases)
-  case (combine_blocks_wait1 comms blks1 blks2 blks rdy1 rdy2 hist hist1 hist2 rdy t)
-  have a: "t =  d1" "t = d2"
-    using combine_blocks_wait1(2,3) WaitBlk_cong by blast+
-  then show ?case
-    using combine_blocks_wait1(10) by auto
-next
-  case (combine_blocks_wait2 comms' blks1 t2 t1 hist2 rdy2' blks2 blks rdy1' hist hist1 rdy)
-  have a: "d1 = t1" "d2 = t2" "rdy1 = rdy1'" "rdy2 = rdy2'" "tr1 = blks1" "tr2 = blks2" 
-    using combine_blocks_wait2(2,3) using WaitBlk_cong by blast+
-  have a2: "WaitBlk d2 p2 rdy2 = WaitBlk d2 hist2 rdy2"
-    using combine_blocks_wait2(3) unfolding a[symmetric] by auto
-  have a3: "WaitBlk d1 p2 rdy2 = WaitBlk d1 hist2 rdy2"
-           "WaitBlk (d2 - d1) (\<lambda>\<tau>. p2 (\<tau> + d1)) rdy2 = WaitBlk (d2 - d1) (\<lambda>\<tau>. hist2 (\<tau> + d1)) rdy2"
-    using WaitBlk_split[OF a2] combine_blocks_wait2 by auto
-  have b: "WaitBlk d1 (\<lambda>t. ParState (p1 t) (p2 t)) (merge_rdy rdy1 rdy2) =
-           WaitBlk t1 (\<lambda>t. ParState (hist1 t) (hist2 t)) (merge_rdy rdy1' rdy2')"
-    using combine_blocks_wait2.hyps(2) a(1,4) a3
-    by (smt (verit, best) WaitBlk_eqE WaitBlk_eqI list.inject)
-  show ?case
-    apply (rule combine_blocks_wait2) unfolding a3 b
-    using combine_blocks_wait2(4) unfolding combine_blocks_wait2(9,10)
-    by (auto simp add: a combine_blocks_wait2(1,5))
-next
-  case (combine_blocks_wait3 comms t1 t2 hist1 rdy1 blks1 blks2 blks rdy2 hist hist2 rdy)
-  have " d1 = t1" "d2 =  t2"
-    using combine_blocks_wait3(2,3) by (auto simp add: WaitBlk_cong)
-  then show ?case
-    using combine_blocks_wait3(7,12) by auto
-qed (auto)
-
-lemma combine_blocks_waitE4 [sync_elims]:
-  "combine_blocks comms (WaitBlk d1 p1 rdy1 # tr1) (WaitBlk d2 p2 rdy2 # tr2) tr \<Longrightarrow>
-   0 < d2 \<Longrightarrow> d2 < d1 \<Longrightarrow>
-   compat_rdy rdy1 rdy2 \<Longrightarrow>
-   (\<And>tr'. tr = WaitBlk d2 (\<lambda>t. ParState (p1 t) (p2 t)) (merge_rdy rdy1 rdy2) # tr' \<Longrightarrow>
-           combine_blocks comms (WaitBlk (d1 - d2) (\<lambda>t. p1 (t + d2)) rdy1 # tr1) tr2 tr' \<Longrightarrow> P) \<Longrightarrow> P"
-proof (induct rule: combine_blocks.cases)
-  case (combine_blocks_wait1 comms blks1 blks2 blks rdy1 rdy2 hist hist1 hist2 rdy t)
-  have "d1 = t" " d2 = t"
-    using combine_blocks_wait1(2,3) by (auto simp add: WaitBlk_cong)
-  then show ?case
-    using combine_blocks_wait1(10) by auto
-next
-  case (combine_blocks_wait2 comms blks1 t2 t1 hist2 rdy2 blks2 blks rdy1 hist hist1 rdy)
-  have "d1 =  t1" " d2 = t2"
-    using combine_blocks_wait2(2,3) by (auto simp add: WaitBlk_cong)
-  then show ?case
-    using combine_blocks_wait2(7,12) by auto
-next
-  case (combine_blocks_wait3 comms t1 t2 hist1 rdy1' blks1 blks2 blks rdy2' hist hist2 rdy)
-  have a: "d1 = t1" "d2 = t2" "rdy1 = rdy1'" "rdy2 = rdy2'"
-          "tr1 = blks1" "tr2 = blks2" 
-    using combine_blocks_wait3(2,3) using WaitBlk_cong by blast+
-  have a2: "WaitBlk d1 p1 rdy1 = WaitBlk d1 hist1 rdy1"
-    using combine_blocks_wait3(2) unfolding a[symmetric] by auto
-  have a3: "WaitBlk d2 p1 rdy1 = WaitBlk d2 hist1 rdy1"
-           "WaitBlk (d1 - d2) (\<lambda>\<tau>. p1 (\<tau> + d2)) rdy1 = WaitBlk (d1 - d2) (\<lambda>\<tau>. hist1 (\<tau> + d2)) rdy1"
-    using WaitBlk_split[OF a2] combine_blocks_wait3 by auto
-  have b: "WaitBlk d2 (\<lambda>t. ParState (p1 t) (p2 t)) (merge_rdy rdy1 rdy2) =
-           WaitBlk d2 (\<lambda>t. ParState (hist1 t) (hist2 t)) (merge_rdy rdy1' rdy2')"
-    using combine_blocks_wait3 a(2,3) a3
-    by (smt (verit, best) WaitBlk_eqE WaitBlk_eqI list.inject)
-  show ?case
-    apply (rule combine_blocks_wait3) unfolding a3 b
-    using combine_blocks_wait3(4) unfolding combine_blocks_wait3(9,10)
-    by (auto simp add: a combine_blocks_wait3)
-qed (auto)
-
-lemma combine_blocks_waitE5 [sync_elims]:
-  "combine_blocks comms (WaitBlk d1 p1 rdy1 # CommBlock ch_type1 ch1 v1 # tr1) 
-  (WaitBlk d2 p2 rdy2 # CommBlock ch_type2 ch2 v2 # tr2) tr \<Longrightarrow> ch1 \<in> comms \<Longrightarrow> ch2 \<in> comms \<Longrightarrow>
-  (\<And>tr'. ch1 = ch2 \<Longrightarrow> v1 = v2 \<Longrightarrow> d1 = d2 \<Longrightarrow> compat_rdy rdy1 rdy2  \<Longrightarrow>
-   (ch_type1 = In \<and> ch_type2 = Out \<or> ch_type1 = Out \<and> ch_type2 = In) 
-   \<Longrightarrow> tr = WaitBlk d1 (\<lambda>t. ParState (p1 t) (p2 t)) (merge_rdy rdy1 rdy2) # IOBlock ch1 v1 # tr' \<Longrightarrow>
-   combine_blocks comms tr1 tr2 tr' \<Longrightarrow> P)  \<Longrightarrow> P"
-proof (induct rule: combine_blocks.cases, auto elim!: WaitBlk_eqE)
-  fix hist2 a b blks a' b' hist1
-  assume a0: "tr = WaitBlk d1 (\<lambda>\<tau>. ParState (hist1 \<tau>) (hist2 \<tau>)) (a \<union> a', b \<union> b') # blks"
-     and a1: "combine_blocks comms (CommBlock ch_type1 ch1 v1 # tr1) (CommBlock ch_type2 ch2 v2 # tr2) blks"
-     and a2: "ch1 \<in> comms" "ch2 \<in> comms"
-     and a3: "(\<And>tr'. ch1 = ch2 \<Longrightarrow> v1 = v2 \<Longrightarrow> ch_type1 = In \<and> ch_type2 = Out \<or> ch_type1 = Out \<and> ch_type2 = In 
-     \<Longrightarrow> WaitBlk d1 (\<lambda>\<tau>. ParState (hist1 \<tau>) (hist2 \<tau>)) (a \<union> a', b \<union> b') = 
-         WaitBlk d1 (\<lambda>t. ParState (p1 t) (p2 t)) (a \<union> a', b \<union> b') \<and> blks = IOBlock ch2 v2 # tr' \<Longrightarrow>
-         combine_blocks comms tr1 tr2 tr' \<Longrightarrow> P)"
-     and a4: "\<forall>t. 0 \<le> t \<and> t \<le> d1 \<longrightarrow> p1 t = hist1 t" " \<forall>t. 0 \<le> t \<and> t \<le> d1 \<longrightarrow> p2 t = hist2 t"
-  then obtain tr' where "ch1 = ch2" "v1 = v2" "ch_type1 = In \<and> ch_type2 = Out \<or> ch_type1 = Out \<and> ch_type2 = In"
-  "blks = IOBlock ch1 v1 # tr'" "combine_blocks comms tr1 tr2 tr'"
-    using combine_blocks_pairE[of comms ch_type1 ch1 v1 tr1 ch_type2 ch2 v2 tr2 blks] by blast
-  with a4 show ?thesis
-    apply (rule_tac a3, simp_all)
-    using WaitBlk_ext_real by presburger
-next
-  fix hist2 a b blks a' b' hist1
-  assume "combine_blocks comms (CommBlock ch_type1 ch1 v1 # tr1) 
-          (WaitBlk (d2 - d1) (\<lambda>\<tau>. hist2 (\<tau> + d1)) (a, b) # CommBlock ch_type2 ch2 v2 # tr2) blks"
-         "ch1 \<in> comms"
-  then show ?thesis
-    using combine_blocks_pairE2[of comms ch_type1 ch1 v1 tr1 "d2 - d1" "\<lambda>\<tau>. hist2 (\<tau> + d1)"
-    "(a, b)" "CommBlock ch_type2 ch2 v2 # tr2" blks] by auto
-next
-  fix hist1 a b blks a' b' hist2
-  assume "combine_blocks comms (WaitBlk (d1 - d2) (\<lambda>\<tau>. hist1 (\<tau> + d2)) (a, b) # CommBlock ch_type1 ch1 v1 # tr1) 
-         (CommBlock ch_type2 ch2 v2 # tr2) blks" "ch2 \<in> comms"
-  then show ?thesis
-    using combine_blocks_pairE2'[of comms "d1 - d2" "\<lambda>\<tau>. hist1 (\<tau> + d2)" "(a, b)" "CommBlock ch_type1 ch1 v1 # tr1"
-    ch_type2 ch2 v2 tr2 blks] by auto
-qed
-
-lemma combine_blocks_emptyE1 [sync_elims]:
-  "combine_blocks comms [] [] tr \<Longrightarrow> tr = []"
-  by (induct rule: combine_blocks.cases, auto)
-
-lemma combine_blocks_emptyE2 [sync_elims]:
-  "combine_blocks comms (WaitBlk d1 p1 rdy1 # tr1) [] tr \<Longrightarrow> P"
-  by (induct rule: combine_blocks.cases, auto)
-
-lemma combine_blocks_emptyE2' [sync_elims]:
-  "combine_blocks comms [] (WaitBlk d2 p2 rdy2 # tr2) tr \<Longrightarrow> P"
-  by (induct rule: combine_blocks.cases, auto)
-
-lemma combine_blocks_emptyE3 [sync_elims]:
-  "combine_blocks comms (CommBlock ch_type1 ch1 v1 # tr1) [] tr \<Longrightarrow>
-   (\<And>tr'. ch1 \<notin> comms \<Longrightarrow> tr = CommBlock ch_type1 ch1 v1 # tr' \<Longrightarrow>
-           combine_blocks comms tr1 [] tr' \<Longrightarrow> P) \<Longrightarrow> P"
-  by (induct rule: combine_blocks.cases, auto)
-
-lemma combine_blocks_emptyE3' [sync_elims]:
-  "combine_blocks comms [] (CommBlock ch_type2 ch2 v2 # tr2) tr \<Longrightarrow>
-   (\<And>tr'. ch2 \<notin> comms \<Longrightarrow> tr = CommBlock ch_type2 ch2 v2 # tr' \<Longrightarrow>
-           combine_blocks comms [] tr2 tr' \<Longrightarrow> P) \<Longrightarrow> P"
-  by (induct rule: combine_blocks.cases, auto)
-
-subsection \<open>Big-step semantics for parallel processes.\<close>
-
-inductive par_big_step :: "pproc \<Rightarrow> gstate \<Rightarrow> trace \<Rightarrow> gstate \<Rightarrow> bool" where
-  SingleB: "big_step p s1 tr s2 \<Longrightarrow> par_big_step (Single p) (State s1) tr (State s2)"
-| ParallelB:
-    "par_big_step p1 s11 tr1 s12 \<Longrightarrow>
-     par_big_step p2 s21 tr2 s22 \<Longrightarrow>
-     combine_blocks chs tr1 tr2 tr \<Longrightarrow>
-     par_big_step (Parallel p1 chs p2) (ParState s11 s21) tr (ParState s12 s22)"
-
-inductive_cases SingleE: "par_big_step (Single p) s1 tr s2"
-inductive_cases ParallelE: "par_big_step (Parallel p1 ch p2) s1 tr s2"
 
 subsection \<open>Lemmas for well behaved trace\<close>
 

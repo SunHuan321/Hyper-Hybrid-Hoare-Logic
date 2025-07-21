@@ -464,7 +464,7 @@ theorem DC_k:
       then obtain \<sigma>\<^sub>p tr0 l where b0: "(fst \<phi>, \<sigma>\<^sub>p, tr0) \<in> S" "big_step (Cont ode b) \<sigma>\<^sub>p l (fst (snd \<phi>))" 
       "snd (snd \<phi>) = tr0 @ l"
         using in_sem by blast
-      with b0(2) 1 obtain p d where b1: "l = [WaitBlk (ereal d) (\<lambda>\<tau>. State (p \<tau>)) ({}, {})]" 
+      with b0(2) 1 obtain p d where b1: "l = [WaitBlk d (\<lambda>\<tau>. State (p \<tau>)) ({}, {})]" 
       "(fst (snd \<phi>)) = p d" "0 < d" "ODEsol ode p d" "\<forall>t. 0 \<le> t \<and> t < d \<longrightarrow> b (p t)" "\<not> b (p d)" "p 0 = \<sigma>\<^sub>p"
         using contE[of ode b \<sigma>\<^sub>p l "(fst (snd \<phi>))"] by (metis pproj_def split_pairs)
       with assms(1) b0(2) have "ode_inv_assn c l"
@@ -479,10 +479,5 @@ theorem DC_k:
     with assms(3) 2 show ?thesis by auto
   qed
   done
-
-
-          
-
-
 
 end

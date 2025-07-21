@@ -20,18 +20,13 @@ lemma has_vderiv_on_proj:
   by (simp add: has_vector_derivative_proj)
 
 lemma has_vector_derivative_projI:
-  assumes "\<forall>i. ((\<lambda>t. p t $ i) has_vector_derivative q $ i) (at t within D)"
-  shows "(p has_vector_derivative q) (at t within D)"
+  assumes "\<forall>i. ((\<lambda>t. p t $ i) has_vector_derivative q t $ i) (at t within D)"
+  shows "(p has_vector_derivative q t) (at t within D)"
   using assms unfolding has_vector_derivative_def has_derivative_def
   apply (auto simp add: bounded_linear_scaleR_left)
   by (auto intro: vec_tendstoI)
 
 lemma has_vderiv_on_projI:
-  assumes "\<forall>i. ((\<lambda>t. p t $ i) has_vderiv_on (\<lambda>t. q t $ i)) D"
-  shows "(p has_vderiv_on q) D"
-  using assms has_vderiv_on_def has_vector_derivative_projI by metis
-
-lemma has_vdriv_on_projI:
   assumes "\<forall>i. ((\<lambda>t. p t $ i) has_vderiv_on (\<lambda>t. q t $ i)) D"
   shows "(p has_vderiv_on q) D"
   using assms has_vderiv_on_def has_vector_derivative_projI by metis
@@ -471,7 +466,6 @@ proof (rule ccontr)
     by (smt "1" "10" assms(5) atLeastAtMost_iff atLeastLessThan_iff greaterThanLessThan_iff) 
 qed
 
-
 subsection \<open>Definition of states\<close>
 
 text \<open>Variable names\<close>
@@ -479,6 +473,7 @@ type_synonym var = char
 
 text \<open>State\<close>
 type_synonym state = "var \<Rightarrow> real"
+
 text \<open>Expressions\<close>
 type_synonym exp = "state \<Rightarrow> real"
 
@@ -501,38 +496,8 @@ lemma vec_state_map1[simp]: "vec2state (state2vec s) = s"
 lemma vec_state_map2[simp]: "state2vec (vec2state s) = s"
   unfolding vec2state_def state2vec_def by auto
 
-text \<open>Conversion between state pair and vector\<close>
-definition state2vec_Pair :: "(state \<times> state) \<Rightarrow> (real^var) \<times> (real^var)"
-  where "state2vec_Pair ss = (state2vec (fst ss), state2vec (snd ss))"
-
-definition vec2state_Pair :: "(real^var) \<times> (real^var) \<Rightarrow> (state \<times> state)"
-  where "vec2state_Pair vv = (vec2state (fst vv), vec2state (snd vv))"
-
-lemma vec_state_map1_Pair[simp]: "vec2state_Pair (state2vec_Pair s) = s"
-  unfolding vec2state_Pair_def state2vec_Pair_def by auto
-
-lemma vec_state_map2_Pair[simp]: "state2vec_Pair (vec2state_Pair s) = s"
-  unfolding vec2state_Pair_def state2vec_Pair_def by auto
-
-text \<open>Conversion between k-states and vector\<close>
-
-definition state2vec_k :: "(('k :: finite) \<Rightarrow> state) \<Rightarrow> real^('k \<times> var)"
-  where "state2vec_k ss = (\<chi> x. ss (fst x) (snd x))"
-
-definition vec2state_k :: "real^(('k :: finite) \<times> char) \<Rightarrow>('k \<Rightarrow> state) "
-  where "(vec2state_k V) k v = V $ (k, v)"
-
-lemma vec_state_map1_k[simp]: "vec2state_k (state2vec_k s) = s"
-  unfolding vec2state_k_def state2vec_k_def by auto
-
-lemma vec_state_map2_k[simp]: "state2vec_k (vec2state_k s) = s"
-  unfolding vec2state_k_def state2vec_k_def by auto
-
-(*
-lemma "(\<lambda>t. state2vec_k (ps k t) $ (a, b)) = (\<lambda>t. ps k t a b)"
-*)
-
 subsection \<open>Definition of ODEs\<close>
+
 datatype ODE =
   ODE "var \<Rightarrow> exp"
 
@@ -540,96 +505,14 @@ text \<open>Given ODE and a state, find the derivative vector.\<close>
 fun ODE2Vec :: "ODE \<Rightarrow> state \<Rightarrow> vec" where
   "ODE2Vec (ODE f) s = state2vec (\<lambda>a. f a s)"
 
-text \<open>Given the same ODE and two state, find the derivative vector pair.\<close>
-fun ODE2Vec_Pair :: "ODE \<Rightarrow> (state \<times> state) \<Rightarrow> (real^var) \<times> (real^var)" where
-  "ODE2Vec_Pair ode ss = (ODE2Vec ode (fst ss), ODE2Vec ode (snd ss))"
-
-text \<open>Given the same ODE and k-state, find the derivative vector pair.\<close>
-fun ODE2Vec_k :: "ODE \<Rightarrow> (('k :: finite) \<Rightarrow> state) \<Rightarrow> (real^('k \<times> var))" where
-  "ODE2Vec_k (ODE f) ss = state2vec_k (\<lambda>k. \<lambda>x. f x (ss k))"
-
-
 text \<open>History p on time {0 .. d} is a solution to ode.\<close>
 definition ODEsol :: "ODE \<Rightarrow> (real \<Rightarrow> state) \<Rightarrow> real \<Rightarrow> bool" where
   "ODEsol ode p d = (d \<ge> 0 \<and> (\<exists>\<epsilon>>0. ((\<lambda>t. state2vec (p t)) has_vderiv_on (\<lambda>t. ODE2Vec ode (p t))) {-\<epsilon> .. d+\<epsilon>}))"
-
-lemma finite_arg_min:
-  fixes ds :: "'k::finite \<Rightarrow> real"
-  shows "\<exists>k. \<forall>k'. ds k \<le> ds k'"
-proof -
-  let ?S = "range ds"
-  have "finite ?S" by simp
-  then have "?S \<noteq> {}" by auto
-  then have "Min ?S \<in> ?S"
-    using \<open>finite ?S\<close> by simp
-  then obtain k where "ds k = Min ?S"
-    by force
-  then show ?thesis
-    by (metis Min_le \<open>finite (range ds)\<close> rangeI)
-qed
-
-lemma ODEsol_k:
-  fixes ps :: "('k :: finite) \<Rightarrow> real \<Rightarrow> state"
-  assumes "\<forall>k. ODEsol ode (ps k) d"
-  shows "\<exists>e > 0. (\<forall>k. ((\<lambda>t. state2vec (ps k t)) has_vderiv_on (\<lambda>t. ODE2Vec ode (ps k t))) {-e .. d+e})"
-proof-
-  from assms have "\<forall>k. \<exists>e > 0. ((\<lambda>t. state2vec (ps k t)) has_vderiv_on (\<lambda>t. ODE2Vec ode (ps k t))) {-e .. d+e}"
-    using ODEsol_def by blast
-  then obtain es where 1: "(\<forall>k. es k > 0 \<and> ((\<lambda>t. state2vec (ps k t)) has_vderiv_on (\<lambda>t. ODE2Vec ode (ps k t))) {-es k .. d+es k})"
-    by metis
-  obtain k' where 2: "\<forall>k. es k' \<le> es k"
-    using finite_arg_min[of es] by blast
-  let ?e = "es k'"
-  have "\<forall>k. ((\<lambda>t. state2vec (ps k t)) has_vderiv_on (\<lambda>t. ODE2Vec ode (ps k t))) {-?e .. d+?e}"
-    by (metis "1" "2" add_le_cancel_left atLeastatMost_subset_iff has_vderiv_on_subset le_imp_neg_le)
-  with 1 show ?thesis
-    by blast
-qed
-
-
-lemma ODEsol_le: "\<lbrakk>ODEsol ode p d; t \<le> d; t \<ge> 0\<rbrakk> \<Longrightarrow> ODEsol ode p t"
-  apply (simp add: ODEsol_def)
-  by (meson add_le_cancel_right atLeastatMost_subset_iff dual_order.refl has_vderiv_on_subset)
 
 text \<open>History p on time {0 ..} is a solution to ode.\<close>
 definition ODEsolInf :: "ODE \<Rightarrow> (real \<Rightarrow> state) \<Rightarrow> bool" where
   "ODEsolInf ode p = (\<exists>\<epsilon>>0. ((\<lambda>t. state2vec (p t)) has_vderiv_on (\<lambda>t. ODE2Vec ode (p t))) {-\<epsilon> ..})"
 
-subsection \<open>More theorems about derivatives\<close>
-
-lemma has_vderiv_on_Pair:
-  assumes "(f has_vderiv_on f') S"
-      and "(g has_vderiv_on g') S"
-    shows "((\<lambda>x. (f x, g x)) has_vderiv_on (\<lambda>x. (f' x, g' x))) S"
-  using assms
-  by (auto simp: has_vderiv_on_def intro!: derivative_eq_intros)
-
-lemma derivative_exp [simp, derivative_intros]:
-  "(exp has_derivative (*) (exp (x :: real))) (at x)"
-  using DERIV_exp unfolding has_field_derivative_def
-  by auto
-
-lemma derivative_exp_const [derivative_intros]:
-  fixes c :: real
-  shows "((\<lambda>x. exp (c * x)) has_derivative (\<lambda>xa. xa * c * exp (c * x))) (at x)"
-proof-
-  have 1: "((*) c has_derivative (\<lambda>x. x * c)) (at x)"
-    apply (rule has_derivative_eq_rhs)
-     apply (auto intro!: derivative_intros)[1]
-    by auto
-  show ?thesis using has_derivative_exp[OF 1] 
-    by auto
-  qed
-
-lemma SOME_const_vderiv [derivative_intros, simp]:
-  fixes p :: " real \<Rightarrow> bool"
-  assumes "(f has_vderiv_on f') S"
-  shows "((\<lambda>t. (SOME k. p k) * f t) has_vderiv_on (\<lambda>t. (SOME k . p k) * f' t)) S"
-  apply (rule has_vderiv_on_eq_rhs)
-   apply (rule has_vderiv_on_mult)
-    apply (auto intro: derivative_intros)[1]
-  using assms apply auto
-  done
 
 subsection \<open>Further results in analysis\<close>
 
@@ -643,45 +526,8 @@ proof-
     using e(1) has_vderiv_on_subset[OF e(2)] by auto
 qed
 
-lemma ODEsol_old_Pair:
-  assumes "ODEsol ode p1 d"
-      and "ODEsol ode p2 d"
-  shows "((\<lambda>t. state2vec_Pair (p1 t, p2 t)) has_vderiv_on (\<lambda>t. ODE2Vec_Pair ode (p1 t, p2 t))) {0 .. d}"
-proof-
-  from assms have "((\<lambda>t. state2vec (p1 t)) has_vderiv_on (\<lambda>t. ODE2Vec ode (p1 t))) {0 .. d}"  
-                  "((\<lambda>t. state2vec (p2 t)) has_vderiv_on (\<lambda>t. ODE2Vec ode (p2 t))) {0 .. d}"
-    using ODEsol_old[of ode p1 d] ODEsol_old[of ode p2 d] by auto
-  then show ?thesis
-    unfolding state2vec_Pair_def
-    using has_vderiv_on_Pair[of "\<lambda>t. state2vec (p1 t)" "\<lambda>t. ODE2Vec ode (p1 t)" "{0 .. d}"
-    "\<lambda>t. state2vec (p2 t)" "\<lambda>t. ODE2Vec ode (p2 t)"]
-    by auto
-qed
-
-lemma ODEsol_old_k':
-  assumes "\<forall>k. ((\<lambda>t. state2vec (ps k t)) has_vderiv_on (\<lambda>t. ODE2Vec ode (ps k t))) D"
-  shows "((\<lambda>t. state2vec_k (\<lambda>k. ps k t)) has_vderiv_on (\<lambda>t. ODE2Vec_k ode (\<lambda>k. ps k t))) D"
-proof-
-   obtain f where "ode = ODE f" 
-    by (meson ODE2Vec.elims)
-  from assms have "\<forall>k. ((\<lambda>t. state2vec (ps k t)) has_vderiv_on (\<lambda>t. ODE2Vec ode (ps k t))) D"
-    using ODEsol_old by blast
-  then have "\<forall>k i. ((\<lambda>x. ps k x i) has_vderiv_on (\<lambda>x. f i (ps k x))) D"
-    using ODE2Vec.simps \<open>ode = ODE f\<close> has_vderiv_on_proj state2vec_def by fastforce
-  then show ?thesis
-    using has_vdriv_on_projI[of "\<lambda>t. state2vec_k (\<lambda>k. ps k t)" "\<lambda>t. ODE2Vec_k ode (\<lambda>k. ps k t)" "D"]
-    \<open>ode = ODE f\<close> state2vec_k_def 
-    by (smt (z3) ODE2Vec_k.simps has_vderiv_on_def has_vector_derivative_transform vec_lambda_beta)
-qed
-
-lemma ODEsol_old_k:
-  assumes "\<forall>k. ODEsol ode (ps k) d"
-  shows "((\<lambda>t. state2vec_k (\<lambda>k. ps k t)) has_vderiv_on (\<lambda>t. ODE2Vec_k ode (\<lambda>k. ps k t))) {0 .. d}"
-  using ODEsol_old_k'[of ps ode "{0 .. d}"] assms ODEsol_old
-  by blast
-
 lemma ODEsolInf_old:
-   assumes "ODEsolInf ode p"
+   assumes "ODEsolInf  ode p"
    shows "((\<lambda>t. state2vec (p t)) has_vderiv_on (\<lambda>t. ODE2Vec ode (p t))) {0 ..}"
 proof-
   obtain e where e: "e > 0" "((\<lambda>t. state2vec (p t)) has_vderiv_on (\<lambda>t. ODE2Vec ode (p t))) {-e ..}"

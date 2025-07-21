@@ -577,7 +577,7 @@ proof -
         using 2
         unfolding fs_def Let_def apply auto
         subgoal using assms(1) fs_at_most_limit A_minus Period 
-          by (smt mult_diff_mult mult_less_iff1)
+          by (smt (verit) mult_pos_pos)
         subgoal premises pre
         proof-
           have "v^2 \<le> 2 * A_minus * (Stop_point - s)"
@@ -606,7 +606,7 @@ proof -
         using 2
         unfolding fs_def Let_def apply auto
         subgoal using assms(1) fs_at_most_limit A_minus Period 
-          by (smt mult_diff_mult mult_less_iff1)
+          by (smt (verit, ccfv_SIG) C.fs_at_least_zero C_axioms cond3(2) that)
         subgoal 
           apply(subgoal_tac "s + v * Period - A_minus * Period\<^sup>2 / 2  \<le> s")
            prefer 2 subgoal
@@ -785,7 +785,7 @@ definition System :: pproc where
 
 lemma System_Prop:
   assumes "loop_invariant (s0, v0)"
-  shows "\<Turnstile>\<^sub>H\<^sub>L\<^sub>p
+  shows "\<Turnstile>\<^sub>H\<^sub>L\<^sub>P
     {pair_assn (\<lambda>s. s = ((\<lambda>_. 0)(V := v0, S := s0, A := a00)))
                (\<lambda>s. s = ((\<lambda>_. 0)(V := v00', S := s00', Command_a := a00')))}
       System

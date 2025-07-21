@@ -70,7 +70,7 @@ lemma last_P0_inv_snoc [simp]:
   apply (induct vwlist arbitrary: v w) by auto
 
 lemma P0_rep:
-  "\<Turnstile>
+  "\<Turnstile>\<^sub>H\<^sub>L
     {\<lambda>s tr. s = (\<lambda>_. 0)(V := v, W := w) \<and> emp\<^sub>t tr}
       P0
     {\<lambda>s tr. \<exists>vwlist. s = (\<lambda>_. 0)(V := fst(last_P0_inv (v, w) vwlist), W := snd(last_P0_inv (v, w) vwlist)) \<and> P0_inv (v, w) vwlist tr}"
@@ -492,15 +492,6 @@ proof -
           apply (subgoal_tac "{ch} \<inter> fst rdy2 \<noteq> {}")
            apply (smt (verit, ccfv_threshold) compat_rdy.elims(2) compat_rdy.simps fst_conv)
           by auto
-        subgoal using tr'(2) 
-          using combine_blocks_waitE1[of chs "\<infinity>" "(\<lambda>_. ss)" "({}, {ch})" "tr13"
-                 "d'-d" "(\<lambda>t. State (p3' (t + d)))" rdy2 "[OutBlock ch (e (p3' d'))] @ tr22" tr']
-          using assms(3) apply auto
-          apply (subgoal_tac "\<not> compat_rdy ({}, {ch}) rdy2")
-           apply auto
-          apply (subgoal_tac "{ch} \<inter> fst rdy2 \<noteq> {}")
-           apply (smt (verit, ccfv_threshold) compat_rdy.elims(2) compat_rdy.simps fst_conv)
-          by auto
         done
     next
       assume d3:"d=d'"
@@ -536,8 +527,6 @@ proof -
             done
           subgoal for d''
             using tr'(2)
-            by (metis (no_types, lifting) append_Cons combine_blocks_pairE2' pre(2))
-          subgoal using tr'(2)
             by (metis (no_types, lifting) append_Cons combine_blocks_pairE2' pre(2))
           done
       qed
@@ -647,7 +636,7 @@ qed
 qed
 
 lemma system_Prop:
-"\<Turnstile>\<^sub>p {pair_assn (\<lambda> s. s = (\<lambda>_. 0)(V := v0, W := w0)) (\<lambda> s. s = (\<lambda>_. 0)(V := v1, W := w1))} 
+"\<Turnstile>\<^sub>H\<^sub>L\<^sub>P {pair_assn (\<lambda> s. s = (\<lambda>_. 0)(V := v0, W := w0)) (\<lambda> s. s = (\<lambda>_. 0)(V := v1, W := w1))} 
         Parallel (Single P0){''ch_v'', ''ch_m'',''ch_Fc''}(Single P1) 
      {\<exists>\<^sub>g n. trace_gassn (tol_inv_ind v0 w0 v1 w1 n)}"
   apply (rule ParValid_conseq')
