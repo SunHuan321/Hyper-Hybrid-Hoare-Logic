@@ -1616,23 +1616,4 @@ proof-
     by auto
 qed
 
-
-text \<open>Some useful lemmas\<close>
-
-(*
-lemma output1_inputs1:
-  assumes "s\<^sub>p X = s\<^sub>p' X"
-  shows "(assign_vars (update_vars s\<^sub>c s\<^sub>p [(M, (\<lambda>s. s X))]) [(Y, (\<lambda>s. f (s M)))], s\<^sub>p') \<sqsubseteq> Id ( Y ::= (\<lambda>s. f (s X)), s\<^sub>p')"
-  using assms
-  apply simp
-
-lemma output2_inputs1:
-  assumes "s\<^sub>p X1 = s\<^sub>p' X1" "s\<^sub>p X2 = s\<^sub>p' X2" "M1 \<noteq> M2"
-  shows "(assign_vars (update_vars s\<^sub>c s\<^sub>p [(M1, (\<lambda>s. s X1)), (M2, (\<lambda>s. s X2))]) [(Y, (\<lambda>s. f (s M1) (s M2)))], s\<^sub>p') 
-  \<sqsubseteq> Id ( Y ::= (\<lambda>s. f (s X1) (s X2)), s\<^sub>p')"
-  using assms
-  sorry
-*)
-
-
 end                                                 

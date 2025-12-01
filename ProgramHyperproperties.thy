@@ -341,10 +341,30 @@ next
   qed
 qed
 
-theorem encoding_HL_triple:
-  "\<Turnstile>\<^sub>H\<^sub>L {P} C {Q} \<longleftrightarrow> (\<Turnstile> {over_approx (lift_assn P)} C {over_approx (lift_assn Q)})" (is "?A \<longleftrightarrow> ?B")
-  using HL_encode_triple[of P C Q] encoding_HL[of "lift_assn P" C "lift_assn Q"]
-  by auto
+subsection \<open>Encoding Incorrectness Logic\<close>
+
+definition IL where
+  "IL P C Q \<longleftrightarrow> Q \<subseteq> sem C P"
+
+theorem encoding_IL:
+  "IL P C Q \<longleftrightarrow> (\<Turnstile> {under_approx P} C {under_approx Q})" (is "?A \<longleftrightarrow> ?B")
+proof (rule iffI)
+  show "?B \<Longrightarrow> ?A"
+  proof -
+    assume ?B
+    then have "under_approx Q (sem C P)"
+      by (simp add: hyper_hoare_triple_def under_approx_def)
+    then show ?A
+      by (simp add: IL_def under_approx_def)
+  qed
+  assume ?A
+  then show ?B
+    by (simp add: hyper_hoare_triple_def sem_monotonic IL_def under_approx_def subset_trans)
+qed
+
+
+
+
 
 end
 

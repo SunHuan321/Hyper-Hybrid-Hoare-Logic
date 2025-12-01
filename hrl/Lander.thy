@@ -10,6 +10,7 @@ definition W :: char where "W = CHR ''e''"
 
 definition Period :: real where "Period = 0.128"
 
+
 lemma train_vars_distinct [simp]: "T \<noteq> V" "T \<noteq> W"  
                                   "V \<noteq> T" "V \<noteq> W" 
                                   "W \<noteq> T" "W \<noteq> V" 
