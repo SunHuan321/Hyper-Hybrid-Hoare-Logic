@@ -1,0 +1,5 @@
+session H3L_GNI_Bridge = H3L_Core +
+  options [document = false]
+  sessions H3L_GNI_P14
+  theories
+    PhaseG_Global_GNI_Bridge

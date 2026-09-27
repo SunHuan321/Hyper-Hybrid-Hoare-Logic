@@ -1,0 +1,17 @@
+session H3L_Semantics = Ordinary_Differential_Equations +
+  sessions H3L_Oracle
+  directories
+    "hhl"
+    "hrl"
+  theories
+    Analysis_More
+    Language
+    Extended
+    "hhl/BigStepSimple"
+    "hhl/BigStepContinuous"
+    "hhl/BigStepParallel"
+    "hhl/ContinuousInvHHL"
+    "hhl/ComplementlemmaHHL"
+    "hrl/Par_Refine"
+    "hrl/Sync_Refine"
+    "hrl/Lander"

@@ -1,0 +1,5 @@
+session H3L_GNI_WF = H3L_GNI +
+  options [document = false]
+  theories
+    PhaseG_BigStep_Wf
+    PhaseG_Scale_Unbounded

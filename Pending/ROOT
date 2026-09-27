@@ -1,0 +1,6 @@
+session H3L_Pending = H3L_Core +
+  theories
+    HybridDisproving
+    HybridHyperpropertyClasses
+    HybridExpressivity
+    HHL_Encodings

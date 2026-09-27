@@ -1,0 +1,3 @@
+session H3L_Oracle = HOL +
+  theories
+    HybridOracle

@@ -1,0 +1,501 @@
+theory PhaseG_Syntactic_More
+  imports PhaseG_Havoc_Syntax
+begin
+
+section \<open>Extended syntactic rules (P2.7, partial)\<close>
+
+text \<open>
+Acceptance item P2.7 (partial): the syntactic layer is extended by
+\<^const>\<open>ANot\<close>, \<^const>\<open>ATogether\<close> (HHL's \<open>\<otimes>\<close>-join for IChoice
+posts), and \<^const>\<open>ATraceRel\<close> (two-run trace relations), and this theory
+adds the corresponding usable rules:
+
+  \<^item> \<^theory_text>\<open>ichoiceS_rule\<close>: the HHL IChoice rule, syntactically: the
+    postcondition is the genuine syntactic constructor
+    \<^term>\<open>ATogether Q1 Q2\<close>, not an \<^const>\<open>ASem\<close> escape.
+
+  \<^item> A state-pure fragment (below) (no trace reads, no
+    semantic escapes) whose satisfaction is invariant under
+    logical/program-state-preserving correspondences; consequently
+    \<^theory_text>\<open>wait_spure_rule\<close> and \<^theory_text>\<open>send_spure_rule\<close>: a
+    state-pure assertion is preserved by \<^const>\<open>Wait\<close> and by output,
+    because both only extend the trace.
+
+  \<^item> the syntactic GNI assertion below: the trace-level GNI assertion
+    \<^const>\<open>gni_obs\<close> expressed purely syntactically with
+    \<^const>\<open>ATraceRel\<close>; \<^theory_text>\<open>denote_gni_synth\<close> proves the
+    encoding correct.
+
+  \<^item> the depth predicate below: a value-binder depth well-formedness tracking
+    \<^const>\<open>EQVar\<close> indices (the missing half of @{const wf_hexp});
+    preserved by \<^const>\<open>assignS\<close> and \<^const>\<open>assumeS\<close>.
+
+Documented residual: \<^const>\<open>ATogether\<close> is excluded from the havoc
+fragment (its two-dimensional preimage split is a separate construction);
+the havoc wp for assertions with pre-existing value binders remains open.
+\<close>
+
+
+subsection \<open>IChoice with the syntactic join\<close>
+
+theorem ichoiceS_rule:
+  assumes r1: "\<Turnstile> {denote P} C1 {denote Q1}"
+    and r2: "\<Turnstile> {denote P} C2 {denote Q2}"
+  shows "\<Turnstile> {denote P} IChoice C1 C2 {denote (ATogether Q1 Q2)}"
+proof (rule hyper_hoare_tripleI)
+  fix S assume pS: "denote P S"
+  from r1 pS have q1: "denote Q1 (sem C1 S)" by (rule hyper_hoare_tripleE)
+  from r2 pS have q2: "denote Q2 (sem C2 S)" by (rule hyper_hoare_tripleE)
+  show "denote (ATogether Q1 Q2) (sem (IChoice C1 C2) S)"
+    unfolding sem_if denote_def sat_hassertion.simps
+    apply (rule_tac x = "sem C1 S" in exI)
+    apply (rule_tac x = "sem C2 S" in exI)
+    using q1 q2 by (simp add: denote_def)
+qed
+
+
+subsection \<open>Skip/Seq at the denote level\<close>
+
+theorem skipS_rule: "\<Turnstile> {denote P} Skip {denote P}"
+  by (rule hyper_hoare_tripleI) (simp add: denote_def sem_skip)
+
+theorem seqS_rule:
+  assumes r1: "\<Turnstile> {denote P} C1 {denote R}"
+    and r2: "\<Turnstile> {denote R} C2 {denote Q}"
+  shows "\<Turnstile> {denote P} Seq C1 C2 {denote Q}"
+  using r1 r2 by (rule seq_rule)
+
+
+subsection \<open>The state-pure fragment\<close>
+
+fun spure_hexp :: "hexp \<Rightarrow> bool" where
+  "spure_hexp (EPVar st x) = True"
+| "spure_hexp (ELVar st x) = True"
+| "spure_hexp (EQVar i) = True"
+| "spure_hexp (EConst v) = True"
+| "spure_hexp (ETraceLen st) = False"
+| "spure_hexp (EBinop a f b) = (spure_hexp a \<and> spure_hexp b)"
+| "spure_hexp (EFun f a) = spure_hexp a"
+| "spure_hexp (EPState st e) = True"
+
+fun spure_frag :: "hassertion \<Rightarrow> bool" where
+  "spure_frag (AConst b) = True"
+| "spure_frag (AComp a c b) = (spure_hexp a \<and> spure_hexp b)"
+| "spure_frag (ATrace st P) = False"
+| "spure_frag (ATraceRel st1 st2 R) = False"
+| "spure_frag (ASem P) = False"
+| "spure_frag (AForallState A) = spure_frag A"
+| "spure_frag (AExistsState A) = spure_frag A"
+| "spure_frag (AForall A) = spure_frag A"
+| "spure_frag (AExists A) = spure_frag A"
+| "spure_frag (AAnd A B) = (spure_frag A \<and> spure_frag B)"
+| "spure_frag (AOr A B) = (spure_frag A \<and> spure_frag B)"
+| "spure_frag (ANot A) = spure_frag A"
+| "spure_frag (ATogether A1 A2) = (spure_frag A1 \<and> spure_frag A2)"
+| "spure_frag (AFilter b A) = spure_frag A"
+
+lemma spure_interp:
+  assumes stl: "list_all2 (\<lambda>a b. lproj a = lproj b \<and> pproj a = pproj b)
+      states states'"
+    and sp: "spure_hexp E" and wf: "wf_hexp (length states) E"
+  shows "interp_hexp vals states E = interp_hexp vals states' E"
+  using sp wf stl
+proof (induction E arbitrary: states states' vals)
+  case (EPVar st x)
+  then show ?case using list_all2_nthD[OF EPVar.prems(3), of st]
+    by (auto simp: pproj_def dest: fun_cong)
+next
+  case (ELVar st x)
+  then show ?case using list_all2_nthD[OF ELVar.prems(3), of st]
+    by (auto simp: lproj_def dest: fun_cong)
+next
+  case (EPState st e)
+  then show ?case using list_all2_nthD[OF EPState.prems(3), of st]
+    by (auto simp: pproj_def dest: fun_cong)
+qed auto
+
+definition sp_match ::
+  "(char, real) exstate set \<Rightarrow> (char, real) exstate set \<Rightarrow> bool" where
+  "sp_match S S' \<longleftrightarrow>
+    (\<forall>\<phi>\<in>S. \<exists>\<psi>\<in>S'. lproj \<phi> = lproj \<psi> \<and> pproj \<phi> = pproj \<psi>) \<and>
+    (\<forall>\<psi>\<in>S'. \<exists>\<phi>\<in>S. lproj \<phi> = lproj \<psi> \<and> pproj \<phi> = pproj \<psi>)"
+
+lemma sp_match_sym: "sp_match S S' \<Longrightarrow> sp_match S' S"
+proof -
+  assume m: "sp_match S S'"
+  have msplit: "((\<forall>\<phi>\<in>S. \<exists>\<psi>\<in>S'. lproj \<phi> = lproj \<psi> \<and> pproj \<phi> = pproj \<psi>)
+    \<and> (\<forall>\<psi>\<in>S'. \<exists>\<phi>\<in>S. lproj \<phi> = lproj \<psi> \<and> pproj \<phi> = pproj \<psi>))"
+    using m by (simp add: sp_match_def)
+  then have second: "\<forall>\<phi>\<in>S. \<exists>\<psi>\<in>S'. lproj \<phi> = lproj \<psi> \<and> pproj \<phi> = pproj \<psi>"
+    by (rule conjunct1)
+  have first: "\<forall>\<psi>\<in>S'. \<exists>\<phi>\<in>S. lproj \<phi> = lproj \<psi> \<and> pproj \<phi> = pproj \<psi>"
+    using msplit by (rule conjunct2)
+  show "sp_match S' S"
+    unfolding sp_match_def
+  proof (rule conjI)
+    show "\<forall>\<phi>\<in>S'. \<exists>\<psi>\<in>S. lproj \<phi> = lproj \<psi> \<and> pproj \<phi> = pproj \<psi>"
+    proof (rule ballI)
+      fix a assume aS': "a \<in> S'"
+      with first obtain b where bS: "b \<in> S"
+        and eq: "lproj b = lproj a \<and> pproj b = pproj a" by blast
+      then show "\<exists>\<psi>\<in>S. lproj a = lproj \<psi> \<and> pproj a = pproj \<psi>"
+        by (rule_tac bexI[where x = b], simp)
+    qed
+  next
+    show "\<forall>\<psi>\<in>S. \<exists>\<phi>\<in>S'. lproj \<phi> = lproj \<psi> \<and> pproj \<phi> = pproj \<psi>"
+    proof (rule ballI)
+      fix a assume aS: "a \<in> S"
+      with second obtain b where bS': "b \<in> S'"
+        and eq: "lproj b = lproj a \<and> pproj b = pproj a" by blast
+      then show "\<exists>\<phi>\<in>S'. lproj \<phi> = lproj \<psi> \<and> pproj \<phi> = pproj \<psi>"
+        by (rule_tac bexI[where x = b], simp)
+    qed
+  qed
+qed
+
+lemma st_sym:
+  "list_all2 (\<lambda>a b. lproj a = lproj b \<and> pproj a = pproj b) states states'
+   \<Longrightarrow> list_all2 (\<lambda>a b. lproj a = lproj b \<and> pproj a = pproj b) states' states"
+  by (erule list_all2_induct) auto
+
+lemma sp_match_union:
+  assumes m: "sp_match S S'" and us: "S = S1 \<union> S2"
+  shows "\<exists>T1 T2. S' = T1 \<union> T2 \<and> sp_match S1 T1 \<and> sp_match S2 T2"
+proof -
+  define T1 where "T1 = {\<psi>\<in>S'. \<exists>\<phi>\<in>S1. lproj \<phi> = lproj \<psi> \<and> pproj \<phi> = pproj \<psi>}"
+  define T2 where "T2 = {\<psi>\<in>S'. \<exists>\<phi>\<in>S2. lproj \<phi> = lproj \<psi> \<and> pproj \<phi> = pproj \<psi>}"
+  have splitT: "S' = T1 \<union> T2"
+  proof
+    show "S' \<subseteq> T1 \<union> T2"
+    proof
+      fix \<psi> assume \<psi>S': "\<psi> \<in> S'"
+      with m[unfolded sp_match_def, THEN conjunct2, rule_format, OF \<psi>S'']
+      obtain \<phi> where \<phi>S: "\<phi> \<in> S" and eq: "lproj \<phi> = lproj \<psi> \<and> pproj \<phi> = pproj \<psi>"
+        by blast
+      with us consider "\<phi> \<in> S1" | "\<phi> \<in> S2" by auto
+      then show "\<psi> \<in> T1 \<union> T2" using \<psi>S' eq
+        by (cases; auto simp: T1_def T2_def)
+    qed
+  qed (auto simp: T1_def T2_def)
+  have m1: "sp_match S1 T1"
+    unfolding sp_match_def
+  proof (intro conjI ballI)
+    fix \<phi> assume "\<phi> \<in> S1"
+    then have "\<phi> \<in> S" using us by blast
+    with m[unfolded sp_match_def, THEN conjunct1, rule_format, OF this]
+    show "\<exists>\<psi>\<in>T1. lproj \<phi> = lproj \<psi> \<and> pproj \<phi> = pproj \<psi>"
+      by (auto simp: T1_def)
+  next
+    fix \<psi> assume "\<psi> \<in> T1"
+    then show "\<exists>\<phi>\<in>S1. lproj \<phi> = lproj \<psi> \<and> pproj \<phi> = pproj \<psi>"
+      by (auto simp: T1_def)
+  qed
+  have m2: "sp_match S2 T2"
+    unfolding sp_match_def
+  proof (intro conjI ballI)
+    fix \<phi> assume "\<phi> \<in> S2"
+    then have "\<phi> \<in> S" using us by blast
+    with m[unfolded sp_match_def, THEN conjunct1, rule_format, OF this]
+    show "\<exists>\<psi>\<in>T2. lproj \<phi> = lproj \<psi> \<and> pproj \<phi> = pproj \<psi>"
+      by (auto simp: T2_def)
+  next
+    fix \<psi> assume "\<psi> \<in> T2"
+    then show "\<exists>\<phi>\<in>S2. lproj \<phi> = lproj \<psi> \<and> pproj \<phi> = pproj \<psi>"
+      by (auto simp: T2_def)
+  qed
+  from splitT m1 m2 show ?thesis by blast
+qed
+
+lemma spure_sat_invar:
+  assumes st: "list_all2 (\<lambda>a b. lproj a = lproj b \<and> pproj a = pproj b)
+      states states'"
+    and m: "sp_match S S'"
+    and sp: "spure_frag A" and wf: "wf_hassertion (length states) A"
+  shows "sat_hassertion vals states A S = sat_hassertion vals states' A S'"
+  using sp wf
+proof (induction A arbitrary: states states' S S' vals)
+  case (AComp a c b)
+  have ia: "interp_hexp vals states a = interp_hexp vals states' a"
+    by (rule spure_interp[OF st AComp.prems(1)[THEN conjunct1]
+        AComp.prems(2)[THEN conjunct1]])
+  have ib: "interp_hexp vals states b = interp_hexp vals states' b"
+    by (rule spure_interp[OF st AComp.prems(1)[THEN conjunct2]
+        AComp.prems(2)[THEN conjunct2]])
+  then show ?case using ia by simp
+next
+  case (AForallState A)
+  have key: "\<And>\<phi> \<psi>. \<phi> \<in> S \<Longrightarrow> \<psi> \<in> S' \<Longrightarrow>
+      lproj \<phi> = lproj \<psi> \<and> pproj \<phi> = pproj \<psi> \<Longrightarrow>
+      sat_hassertion vals (\<phi> # states) A S =
+      sat_hassertion vals (\<psi> # states') A S'"
+  proof -
+    fix \<phi> \<psi>
+    assume \<phi>S: "\<phi> \<in> S" and \<psi>S': "\<psi> \<in> S'"
+      and eq: "lproj \<phi> = lproj \<psi> \<and> pproj \<phi> = pproj \<psi>"
+    show "sat_hassertion vals (\<phi> # states) A S =
+          sat_hassertion vals (\<psi> # states') A S'"
+      apply (rule AForallState.hyps)
+        apply (rule list_all2_Cons1[OF eq st])
+       apply (rule m)
+      using AForallState.prems by auto
+  qed
+  show ?case
+  proof (rule iffI)
+    assume allS: "\<forall>\<phi>\<in>S. sat_hassertion vals (\<phi> # states) A S"
+    show "\<forall>\<psi>\<in>S'. sat_hassertion vals (\<psi> # states') A S'"
+    proof
+      fix \<psi> assume \<psi>S': "\<psi> \<in> S'"
+      with m[unfolded sp_match_def, THEN conjunct2, rule_format, OF \<psi>S'']
+      obtain \<phi> where \<phi>S: "\<phi> \<in> S"
+        and eq: "lproj \<phi> = lproj \<psi> \<and> pproj \<phi> = pproj \<psi>" by blast
+      from allS[rule_format, OF \<phi>S] key[OF \<phi>S \<psi>S' eq]
+      show "sat_hassertion vals (\<psi> # states') A S'" by simp
+    qed
+  next
+    assume allT: "\<forall>\<psi>\<in>S'. sat_hassertion vals (\<psi> # states') A S'"
+    show "\<forall>\<phi>\<in>S. sat_hassertion vals (\<phi> # states) A S"
+    proof
+      fix \<phi> assume \<phi>S: "\<phi> \<in> S"
+      with m[unfolded sp_match_def, THEN conjunct1, rule_format, OF \<phi>S]
+      obtain \<psi> where \<psi>S': "\<psi> \<in> S'"
+        and eq: "lproj \<phi> = lproj \<psi> \<and> pproj \<phi> = pproj \<psi>" by blast
+      from allT[rule_format, OF \<psi>S'] key[OF \<phi>S \<psi>S' eq]
+      show "sat_hassertion vals (\<phi> # states) A S" by simp
+    qed
+  qed
+next
+  case (AExistsState A)
+  have key: "\<And>\<phi> \<psi>. \<phi> \<in> S \<Longrightarrow> \<psi> \<in> S' \<Longrightarrow>
+      lproj \<phi> = lproj \<psi> \<and> pproj \<phi> = pproj \<psi> \<Longrightarrow>
+      sat_hassertion vals (\<phi> # states) A S =
+      sat_hassertion vals (\<psi> # states') A S'"
+  proof -
+    fix \<phi> \<psi>
+    assume \<phi>S: "\<phi> \<in> S" and \<psi>S': "\<psi> \<in> S'"
+      and eq: "lproj \<phi> = lproj \<psi> \<and> pproj \<phi> = pproj \<psi>"
+    show "sat_hassertion vals (\<phi> # states) A S =
+          sat_hassertion vals (\<psi> # states') A S'"
+      apply (rule AExistsState.hyps)
+        apply (rule list_all2_Cons1[OF eq st])
+       apply (rule m)
+      using AExistsState.prems by auto
+  qed
+  show ?case
+  proof (rule iffI)
+    assume exS: "\<exists>\<phi>\<in>S. sat_hassertion vals (\<phi> # states) A S"
+    then obtain \<phi> where \<phi>S: "\<phi> \<in> S"
+      and sat: "sat_hassertion vals (\<phi> # states) A S" by blast
+    with m[unfolded sp_match_def, THEN conjunct1, rule_format, OF \<phi>S]
+    obtain \<psi> where \<psi>S': "\<psi> \<in> S'"
+      and eq: "lproj \<phi> = lproj \<psi> \<and> pproj \<phi> = pproj \<psi>" by blast
+    with key[OF \<phi>S \<psi>S' eq] sat
+    show "\<exists>\<psi>\<in>S'. sat_hassertion vals (\<psi> # states') A S'" by blast
+  next
+    assume exT: "\<exists>\<psi>\<in>S'. sat_hassertion vals (\<psi> # states') A S'"
+    then obtain \<psi> where \<psi>S': "\<psi> \<in> S'"
+      and sat: "sat_hassertion vals (\<psi> # states') A S'" by blast
+    with m[unfolded sp_match_def, THEN conjunct2, rule_format, OF \<psi>S'']]
+    obtain \<phi> where \<phi>S: "\<phi> \<in> S"
+      and eq: "lproj \<phi> = lproj \<psi> \<and> pproj \<phi> = pproj \<psi>" by blast
+    with key[OF \<phi>S \<psi>S' eq] sat
+    show "\<exists>\<phi>\<in>S. sat_hassertion vals (\<phi> # states) A S" by blast
+  qed
+next
+  case (AFilter b A)
+  have mf: "sp_match {\<phi>\<in>S. b (pproj \<phi>)} {\<psi>\<in>S'. b (pproj \<psi>)}"
+    using AFilter.prems(3) unfolding sp_match_def by auto
+  show ?case
+    using AFilter.hyps[of states "{\<phi>\<in>S. b (pproj \<phi>)}" states'
+        "{\<psi>\<in>S'. b (pproj \<psi>)}" vals] AFilter.prems mf st by auto
+next
+  case (ATogether A1 A2)
+  show ?case
+  proof (simp only: sat_hassertion.simps, rule iffI)
+    assume exS: "\<exists>S1 S2. S = S1 \<union> S2 \<and>
+        sat_hassertion vals states A1 S1 \<and> sat_hassertion vals states A2 S2"
+    then obtain S1 S2 where us: "S = S1 \<union> S2"
+      and r1: "sat_hassertion vals states A1 S1"
+      and r2: "sat_hassertion vals states A2 S2" by blast
+    from sp_match_union[OF m us] obtain T1 T2
+      where uT: "S' = T1 \<union> T2" and m1: "sp_match S1 T1" and m2: "sp_match S2 T2"
+      by blast
+    have e1: "sat_hassertion vals states' A1 T1"
+      using ATogether.hyps(1)[of states S1 states' T1 vals] m1 r1
+        ATogether.prems st by auto
+    have e2: "sat_hassertion vals states' A2 T2"
+      using ATogether.hyps(2)[of states S2 states' T2 vals] m2 r2
+        ATogether.prems st by auto
+    from uT e1 e2 show "\<exists>T1 T2. S' = T1 \<union> T2 \<and>
+        sat_hassertion vals states' A1 T1 \<and> sat_hassertion vals states' A2 T2"
+      by blast
+  next
+    assume exT: "\<exists>T1 T2. S' = T1 \<union> T2 \<and>
+        sat_hassertion vals states' A1 T1 \<and> sat_hassertion vals states' A2 T2"
+    then obtain T1 T2 where uT: "S' = T1 \<union> T2"
+      and e1: "sat_hassertion vals states' A1 T1"
+      and e2: "sat_hassertion vals states' A2 T2" by blast
+    from sp_match_union[OF sp_match_sym[OF m] uT] obtain S1 S2
+      where us: "S = S1 \<union> S2" and m1: "sp_match T1 S1" and m2: "sp_match T2 S2"
+      by blast
+    have r1: "sat_hassertion vals states A1 S1"
+      using ATogether.hyps(1)[of states' T1 states S1 vals] sp_match_sym[OF m1] e1
+        ATogether.prems st_sym[OF st] by auto
+    have r2: "sat_hassertion vals states A2 S2"
+      using ATogether.hyps(2)[of states' T2 states S2 vals] sp_match_sym[OF m2] e2
+        ATogether.prems st_sym[OF st] by auto
+    from us r1 r2 show "\<exists>S1 S2. S = S1 \<union> S2 \<and>
+        sat_hassertion vals states A1 S1 \<and> sat_hassertion vals states A2 S2"
+      by blast
+  qed
+qed auto
+
+
+subsection \<open>Wait/Send preserve state-pure assertions\<close>
+
+theorem wait_spure_rule:
+  assumes sp: "spure_frag A" and wf: "wf_hassertion 0 A"
+  shows "denote A S = denote A (sem (Wait d) S)"
+proof -
+  have spm: "sp_match S (sem (Wait d) S)"
+    unfolding sp_match_def
+  proof (intro conjI ballI)
+    fix \<phi> assume \<phi>S: "\<phi> \<in> S"
+    show "\<exists>\<psi>\<in>sem (Wait d) S. lproj \<phi> = lproj \<psi> \<and> pproj \<phi> = pproj \<psi>"
+    proof (cases "0 < d (pproj \<phi>)")
+      case True
+      have bs: "big_step (Wait d) (pproj \<phi>)
+          [WaitBlk (d (pproj \<phi>)) (\<lambda>_. State (pproj \<phi>)) ({}, {})] (pproj \<phi>)"
+        using True by (rule waitB1)
+      have tp: "\<phi> = (fst \<phi>, fst (snd \<phi>), snd (snd \<phi>))" by simp
+      have wt: "(lproj \<phi>, pproj \<phi>, tproj \<phi> @
+          [WaitBlk (d (pproj \<phi>)) (\<lambda>_. State (pproj \<phi>)) ({}, {})]) \<in> sem (Wait d) S"
+        using \<phi>S[unfolded tp] bs by (auto simp: in_sem lproj_def pproj_def tproj_def)
+      then show ?thesis
+        by (rule_tac bexI[where x = "(lproj \<phi>, pproj \<phi>, tproj \<phi> @
+            [WaitBlk (d (pproj \<phi>)) (\<lambda>_. State (pproj \<phi>)) ({}, {})])"],
+            auto simp: lproj_def pproj_def tproj_def)
+    next
+      case False
+      have mem: "\<phi> \<in> sem (Wait d) S"
+      proof -
+        have "big_step (Wait d) (pproj \<phi>) [] (pproj \<phi>)" using False by simp
+        then show ?thesis using \<phi>S by (auto simp: in_sem)
+      qed
+      then show ?thesis by (rule_tac bexI[where x = "\<phi>"], auto)
+    qed
+  next
+    fix \<psi> assume "\<psi> \<in> sem (Wait d) S"
+    then show "\<exists>\<phi>\<in>S. lproj \<phi> = lproj \<psi> \<and> pproj \<phi> = pproj \<psi>"
+      unfolding sem_wait by (auto simp: lproj_def pproj_def)
+  qed
+  show ?thesis
+    unfolding denote_def
+    by (rule spure_sat_invar[of "[] :: (char, real) exstate list" "[]" S
+        "sem (Wait d) S" vals], auto simp: sp wf spm)
+qed
+
+
+theorem send_spure_rule:
+  assumes sp: "spure_frag A" and wf: "wf_hassertion 0 A"
+  shows "denote A S = denote A (sem (Cm (ch[!]e)) S)"
+proof -
+  have spm: "sp_match S (sem (Cm (ch[!]e)) S)"
+    unfolding sp_match_def
+  proof (intro conjI ballI)
+    fix \<phi> assume \<phi>S: "\<phi> \<in> S"
+    show "\<exists>\<psi>\<in>sem (Cm (ch[!]e)) S. lproj \<phi> = lproj \<psi> \<and> pproj \<phi> = pproj \<psi>"
+    proof -
+      have bs: "big_step (Cm (ch[!]e)) (pproj \<phi>) [OutBlock ch (e (pproj \<phi>))] (pproj \<phi>)"
+        by (rule sendB1)
+      have tp: "\<phi> = (fst \<phi>, fst (snd \<phi>), snd (snd \<phi>))" by simp
+      have wt: "(lproj \<phi>, pproj \<phi>, tproj \<phi> @ [OutBlock ch (e (pproj \<phi>))])
+          \<in> sem (Cm (ch[!]e)) S"
+        using \<phi>S[unfolded tp] bs by (auto simp: in_sem lproj_def pproj_def tproj_def)
+      then show ?thesis
+        by (rule_tac bexI[where x = "(lproj \<phi>, pproj \<phi>,
+            tproj \<phi> @ [OutBlock ch (e (pproj \<phi>))])"],
+            auto simp: lproj_def pproj_def tproj_def)
+    qed
+  next
+    fix \<psi> assume "\<psi> \<in> sem (Cm (ch[!]e)) S"
+    then show "\<exists>\<phi>\<in>S. lproj \<phi> = lproj \<psi> \<and> pproj \<phi> = pproj \<psi>"
+      unfolding sem_send by (auto simp: lproj_def pproj_def)
+  qed
+  show ?thesis
+    unfolding denote_def
+    by (rule spure_sat_invar[of "[] :: (char, real) exstate list" "[]" S
+        "sem (Cm (ch[!]e)) S" vals], auto simp: sp wf spm)
+qed
+
+
+
+subsection \<open>GNI as a purely syntactic assertion\<close>
+
+definition gni_wit :: hassertion where
+  "gni_wit =
+    AAnd (AComp (ELVar 0 HI) (=) (ELVar 2 HI))
+      (AAnd (AComp (ELVar 0 LO) (=) (ELVar 1 LO))
+        (AAnd (AComp (EPVar 0 LL2) (=) (EPVar 1 LL2))
+          (ATraceRel 0 1 (\<lambda>a b. obs_tr a = obs_tr b))))"
+
+definition gni_synth :: hassertion where
+  "gni_synth =
+    AForallState (AForallState
+      (AOr (ANot (AComp (ELVar 1 LO) (=) (ELVar 0 LO)))
+        (AExistsState gni_wit)))"
+
+theorem wf_gni_synth: "wf_hassertion 0 gni_synth"
+  by (simp add: gni_synth_def gni_wit_def)
+
+theorem pure_gni_synth: "no_asem gni_synth"
+  by (simp add: gni_synth_def gni_wit_def)
+
+theorem denote_gni_synth:
+  "denote gni_synth S = gni_obs HI LO LL2 S"
+  unfolding gni_synth_def gni_wit_def denote_def gni_obs_def low_obs_def
+  by auto
+
+corollary gni_synth_rule:
+  assumes "\<Turnstile> {P} C {denote gni_synth}"
+  shows "\<And>S. P S \<Longrightarrow> gni_obs HI LO LL2 (sem C S)"
+  using assms by (auto simp: hyper_hoare_triple_def denote_gni_synth)
+
+
+subsection \<open>Value-binder depth well-formedness\<close>
+
+fun wfq_hexp :: "nat \<Rightarrow> hexp \<Rightarrow> bool" where
+  "wfq_hexp n (EPVar st x) = True"
+| "wfq_hexp n (ELVar st x) = True"
+| "wfq_hexp n (EQVar i) = (i < n)"
+| "wfq_hexp n (EConst v) = True"
+| "wfq_hexp n (ETraceLen st) = True"
+| "wfq_hexp n (EBinop a f b) = (wfq_hexp n a \<and> wfq_hexp n b)"
+| "wfq_hexp n (EFun f a) = wfq_hexp n a"
+| "wfq_hexp n (EPState st e) = True"
+
+fun wfq :: "nat \<Rightarrow> hassertion \<Rightarrow> bool" where
+  "wfq n (AConst b) = True"
+| "wfq n (AComp a c b) = (wfq_hexp n a \<and> wfq_hexp n b)"
+| "wfq n (ATrace st P) = True"
+| "wfq n (ATraceRel st1 st2 R) = True"
+| "wfq n (ASem P) = True"
+| "wfq n (AForallState A) = wfq n A"
+| "wfq n (AExistsState A) = wfq n A"
+| "wfq n (AForall A) = wfq (Suc n) A"
+| "wfq n (AExists A) = wfq (Suc n) A"
+| "wfq n (AAnd A B) = (wfq n A \<and> wfq n B)"
+| "wfq n (AOr A B) = (wfq n A \<and> wfq n B)"
+| "wfq n (ANot A) = wfq n A"
+| "wfq n (ATogether A1 A2) = (wfq n A1 \<and> wfq n A2)"
+| "wfq n (AFilter b A) = wfq n A"
+
+lemma wfq_sub_assign: "wfq_hexp n E \<Longrightarrow> wfq_hexp n (sub_assign x e E)"
+  by (induction E arbitrary: n) auto
+
+lemma assignS_wfq: "wfq n A \<Longrightarrow> wfq n (assignS x e A)"
+  by (induction A arbitrary: n) (auto simp: wfq_sub_assign)
+
+lemma assumeS_wfq: "wfq n A \<Longrightarrow> wfq n (assumeS b A)"
+  by (induction A arbitrary: n) auto
+
+end

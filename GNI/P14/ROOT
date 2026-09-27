@@ -1,0 +1,9 @@
+session H3L_GNI_P14 = H3L_GNI_WF +
+  options [document = false]
+  theories
+    PhaseG_Abs0_GNI
+    PhaseG_Parallel_Scale
+    PhaseG_Concrete_Scale
+    PhaseG_Concrete_GNI
+    PhaseG_Concrete_Positive
+    PhaseG_Global_GNI_Syntax

@@ -1,0 +1,23 @@
+session H3L_GNI = H3L_Semantics +
+  theories
+    PhaseG_Prelude
+    HybridLoopRules
+    HybridCompositionalityRules
+    PhaseG_GNI_v2
+    PhaseG_GNI_v3
+    PhaseG_GNI_trace
+    PhaseG_GNI_hybrid
+    PhaseG_GNI_witness
+    PhaseG_GNI_parallel
+    PhaseG_GNI_comm
+    PhaseG_Syntactic
+    PhaseG_Havoc_Syntax
+    PhaseG_Syntactic_More
+    PhaseG_GNI_async_loop
+    PhaseG_GNI_refinement
+    PhaseG_Lander_MassModel
+    PhaseG_Lander_Mass_Consistency
+    PhaseG_Lander_Obs
+    PhaseG_GNI_parallel_rich
+    PhaseG_Lander_Mass_Witness
+    PhaseG_GNI

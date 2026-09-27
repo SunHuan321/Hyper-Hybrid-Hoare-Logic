@@ -1,0 +1,3 @@
+session H3L_Loops = H3L_Core +
+  theories
+    HybridLoops

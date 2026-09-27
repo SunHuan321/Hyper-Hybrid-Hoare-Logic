@@ -1,0 +1,6 @@
+session H3L_Usability = H3L_Framework +
+  sessions H3L_Loops
+  theories
+    HybridDerivedRules
+    HybridCompositionality
+    HybridAcceptanceExamples

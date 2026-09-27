@@ -4,3 +4,7 @@
 *.thy#
 *.thy#
 \#Logic.thy\#
+
+# documentation and papers: code only in this repository
+*.md
+*.pdf
