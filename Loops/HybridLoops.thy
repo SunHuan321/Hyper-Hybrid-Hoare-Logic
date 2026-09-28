@@ -113,7 +113,7 @@ proof (rule hyper_hoare_tripleI)
   next
     case False
     then have "holds_forall (lnot b) S"
-      using asm0 conj_def low_exp_two_cases by blast
+      using asm0 conj_def low_exp_two_cases by meson
     then show ?thesis
       by (metis asm0 assms(2) conj_def hyper_hoare_tripleE sem_if_then_else(2))
   qed
@@ -327,7 +327,11 @@ proof (rule hyper_hoare_tripleI)
           have "conj (I m) (low_exp b) (iterate_sem m (Assume b; C) S) \<or>
                 holds_forall (lnot b) (iterate_sem m (Assume b; C) S)"
             by (rule while_synchronized_rec[OF triple asm0])
-          with low_exp_two_cases show ?thesis unfolding conj_def by blast
+          with low_exp_two_cases[of b "iterate_sem m (Assume b; C) S"]
+            `\<not> holds_forall b (iterate_sem m (Assume b; C) S)`
+          show ?thesis
+            unfolding conj_def
+            by blast
         qed
         then have "iterate_sem n (Assume b; C) S = {}"
           using \<open>m < n\<close> false_then_empty_later by blast
@@ -404,7 +408,7 @@ proof (rule hyper_hoare_tripleI)
       qed
     qed
     then show ?thesis
-      unfolding conj_def disj_def exists_nat_def using sem_eq exit inv_n by simp
+      unfolding conj_def disj_def exists_nat_def using sem_eq exit inv_n by auto
   qed
 qed
 

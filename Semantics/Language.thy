@@ -755,6 +755,9 @@ fun wf_tblk_par :: "trace_block \<Rightarrow> bool" where
 definition wf_tr_par :: "trace \<Rightarrow> bool" where
   "wf_tr_par tr = list_all wf_tblk_par tr"
 
+lemma wf_waitblk_par: "wf_tblk_par (WaitBlk d p r)"
+  by (metis WaitBlk_def wf_tblk_par.simps(1))
+
 lemma wf_tblk_single_implies:
   assumes "wf_tblk_single blk"
   shows "wf_tblk_par blk"

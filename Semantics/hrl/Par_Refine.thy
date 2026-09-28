@@ -109,9 +109,14 @@ lemma tr_single_refl:
   assumes "refl \<alpha>"
       and "wf_tr_single tr"
     shows "tr_single \<alpha> tr tr"
-  using assms
-  by (metis in_set_conv_decomp list.rel_refl_strong list_all_append list_all_simps(1) 
-      tblk_single_refl tr_single_def wf_tr_single_def)
+  unfolding tr_single_def
+proof (rule list.rel_refl_strong)
+  fix blk assume "blk \<in> set tr"
+  with assms(2) have "wf_tblk_single blk"
+    by (auto simp: wf_tr_single_def list.pred_set)
+  with assms(1) show "tblk_single \<alpha> blk blk"
+    using tblk_single_refl by blast
+qed
 
 lemma tr_single_compose:
   assumes "trans \<alpha>"
@@ -755,7 +760,7 @@ next
   with combine_blocks_wait2.IH combine_blocks_wait2.prems(3,4) f0 obtain blks' where f2:
   "combine_blocks comms blks1' (WaitBlk (t2 - t1) (\<lambda>\<tau>. hist2' (\<tau> + t1)) rdy2 # blks2') blks'"
   "tr_par (\<alpha> \<uplus>\<^sub>p \<beta>) blks blks'"
-    by (metis WaitBlk_def list_all_simps(1) wf_tblk_par.simps(1) wf_tr_par_def)
+    by (metis (no_types, lifting) wf_waitblk_par wf_tr_par_cons wf_tr_par_def list_all_simps(2))
   from f0(3,6) \<open>t1 < t2\<close>  have "tblk_par (\<alpha> \<uplus>\<^sub>p \<beta>) (WaitBlk t1 hist rdy) (WaitBlk t1 (\<lambda>\<tau>. ParState (hist1' \<tau>) (hist2' \<tau>)) rdy)"
     by (simp add: WaitBlk_def combine_blocks_wait2.hyps(5) lift_rel_par_def)
   with f0 f1 f2 combine_blocks_wait2.hyps show ?case 
@@ -772,7 +777,7 @@ next
   with combine_blocks_wait3.IH g0(1,4,5) combine_blocks_wait3.prems(3,4) obtain blks' where g2:
     "combine_blocks comms (WaitBlk (t1 - t2) (\<lambda>\<tau>. hist1' (\<tau> + t2)) rdy1 # blks1') blks2' blks'"
     "tr_par (\<alpha> \<uplus>\<^sub>p \<beta>) blks blks'"
-    by (metis WaitBlk_def list_all_simps(1) wf_tblk_par.simps(1) wf_tr_par_def)
+    by (metis (no_types, lifting) wf_waitblk_par wf_tr_par_cons wf_tr_par_def list_all_simps(2))
   from g0(3,6) \<open>t2 < t1\<close>  have "tblk_par (\<alpha> \<uplus>\<^sub>p \<beta>) (WaitBlk t2 hist rdy) (WaitBlk t2 (\<lambda>\<tau>. ParState (hist1' \<tau>) (hist2' \<tau>)) rdy)"
     by (simp add: WaitBlk_def combine_blocks_wait3.hyps(5) lift_rel_par_def)
   with g0 g1 g2 combine_blocks_wait3.hyps show ?case 

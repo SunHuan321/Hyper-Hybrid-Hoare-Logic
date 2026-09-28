@@ -236,12 +236,18 @@ proof-
     show "\<Turnstile>\<^sub>P {?P} C {?Q}"
     proof (rule par_hyper_hoare_tripleI)
       fix S assume a0: "S = {copy_p_gstate to_pvar to_lval e |e. True}"
-      have "{(recover_p_gstate to_pval to_lvar e, l, ex2gstate e') |e e' l. (e', l) \<in> par_sem C S \<and> 
+      have eq: "{(recover_p_gstate to_pval to_lvar e, l, ex2gstate e') |e e' l. (e', l) \<in> par_sem C S \<and> 
             ex_logical_same e e'} =  set_of_traces C"
         using a0 set_of_traces_same[of to_pvar to_lvar to_pval to_lval]
         r1 r2 by auto
-      then show "H {(recover_p_gstate to_pval to_lvar e, l, ex2gstate e') |e e' l. (e', l) \<in> par_sem C S \<and> ex_logical_same e e'}"
-        by (metis \<open>hypersat C H\<close> hypersat_def set_of_traces_def)
+      from \<open>hypersat C H\<close> have h1: "H {(s, l, s') |s l s'. par_big_step C s l s'}"
+        by (simp add: hypersat_def)
+      moreover have "{(s, l, s') |s l s'. par_big_step C s l s'} = set_of_traces C"
+        unfolding set_of_traces_def by blast
+      ultimately have "H (set_of_traces C)"
+        by simp
+      with eq show "H {(recover_p_gstate to_pval to_lvar e, l, ex2gstate e') |e e' l. (e', l) \<in> par_sem C S \<and> ex_logical_same e e'}"
+        by simp
     qed
   next
     fix C
@@ -249,12 +255,16 @@ proof-
     assume "\<Turnstile>\<^sub>P {?P} C {?Q}"
     then have "?Q (par_sem C ?S)"
       using par_hyper_hoare_tripleE by blast
-    moreover have "{(recover_p_gstate to_pval to_lvar e, l, ex2gstate e') |e e' l. (e', l) \<in> par_sem C ?S 
+    moreover have eq2: "{(recover_p_gstate to_pval to_lvar e, l, ex2gstate e') |e e' l. (e', l) \<in> par_sem C ?S 
     \<and> ex_logical_same e e'} = set_of_traces C"
       using r1 r2 set_of_traces_same[of to_pvar to_lvar to_pval to_lval]
       by presburger
+    ultimately have "H (set_of_traces C)"
+      by simp
+    moreover have "set_of_traces C = {(s, l, s') |s l s'. par_big_step C s l s'}"
+      unfolding set_of_traces_def by blast
     ultimately show "hypersat C H"
-      by (metis hypersat_def set_of_traces_def)
+      by (simp add: hypersat_def)
   qed
   then show ?thesis
     by blast

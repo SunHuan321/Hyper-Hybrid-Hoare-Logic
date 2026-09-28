@@ -385,7 +385,7 @@ proof(rule hyper_hoare_tripleI)
     have ab: "?A ?S1" "?B ?S2"
       using \<open>P S\<close> by auto
     then show "join ?A ?B (?S1 \<union> ?S2)"
-      unfolding join_def by blast
+      by (rule joinI)
   qed
   then show "join (\<lambda>S. \<exists>S0. P S0 \<and> S = {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S0 \<and> \<not> b \<sigma>\<^sub>p})
   (\<lambda>S. \<exists>S0. P S0 \<and> S = {(\<sigma>\<^sub>l, p d, l @ [WaitBlk ( d) (\<lambda>\<tau>. State (p \<tau>)) ({}, {})]) |\<sigma>\<^sub>l l p d. 
@@ -1347,7 +1347,7 @@ proof (rule completeI)
   show "\<turnstile> {P} Assume b {Q}"
   proof (rule ConsH)
     show "\<turnstile> {(\<lambda>S. Q (Set.filter (b \<circ> fst \<circ> snd) S))} (Assume b) {Q}"
-      by (simp add: AssumeH)
+      by (rule AssumeH)
     show "hyper_entails P (\<lambda>S. Q (Set.filter (b \<circ> fst \<circ> snd) S))"
       by (metis (mono_tags, lifting) asm0 assume_sem hyper_entails_def hyper_hoare_tripleE)
     show "hyper_entails Q Q"      
@@ -1367,7 +1367,7 @@ proof (rule completeI)
   show "\<turnstile> {P} Assign x e {Q}"
   proof (rule ConsH)
     show "\<turnstile> {\<lambda>S. Q {(\<sigma>\<^sub>l, \<sigma>\<^sub>p(x := e \<sigma>\<^sub>p), l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S}} Assign x e {Q}"
-      by (simp add: AssignH)
+      by (rule AssignH)
     show "hyper_entails P (\<lambda>S. Q {(\<sigma>\<^sub>l, \<sigma>\<^sub>p(x := e \<sigma>\<^sub>p), l) |\<sigma>\<^sub>l \<sigma>\<^sub>p l. (\<sigma>\<^sub>l, \<sigma>\<^sub>p, l) \<in> S})"
     proof (rule hyper_entailsI)
       fix S assume "P S"

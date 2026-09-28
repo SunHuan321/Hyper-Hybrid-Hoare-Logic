@@ -2,6 +2,18 @@ theory HHL_Encodings
   imports H3L_Core.ProgramHyperproperties
 begin
 
+lemma in_sem_singleton:
+  assumes "big_step C \<sigma>\<^sub>p l \<sigma>\<^sub>p'"
+  shows "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr0 @ l) \<in> sem C {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0)}"
+  using assms in_sem[of "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr0 @ l)" C "{(\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0)}"] by auto
+
+lemma HL_second_direction:
+  assumes ht: "hyper_hoare_triple (over_approx P) C (over_approx Q)"
+  shows "HL P C Q"
+    using ht in_sem_singleton
+    unfolding HL_def
+    by (auto simp: hyper_hoare_triple_def over_approx_def, blast)
+
 theorem encoding_HL:
   "HL P C Q \<longleftrightarrow> (hyper_hoare_triple (over_approx P) C (over_approx Q))"
 proof
@@ -25,25 +37,8 @@ proof
   qed
 next
   assume ht: "hyper_hoare_triple (over_approx P) C (over_approx Q)"
-  show "HL P C Q"
-    unfolding HL_def
-  proof (intro allI impI)
-    fix \<sigma>\<^sub>l \<sigma>\<^sub>p \<sigma>\<^sub>p' tr0 l
-    assume p: "(\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0) \<in> P" and bs: "big_step C \<sigma>\<^sub>p l \<sigma>\<^sub>p'"
-    from p have "over_approx P {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0)}" by (simp add: over_approx_def)
-    then have "over_approx Q (sem C {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0)})"
-      using ht hyper_hoare_tripleE by blast
-    then have "sem C {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0)} \<subseteq> Q" by (simp add: over_approx_def)
-    moreover have "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr0 @ l) \<in> sem C {(\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0)}"
-      using in_sem[of "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr0 @ l)" C "{(\<sigma>\<^sub>l, \<sigma>\<^sub>p, tr0)}"] bs p by blast
-    ultimately show "(\<sigma>\<^sub>l, \<sigma>\<^sub>p', tr0 @ l) \<in> Q" by blast
-  qed
+  show "HL P C Q" by (rule HL_second_direction[OF ht])
 qed
-
-subsection \<open>Encoding Incorrectness Logic\<close>
-
-definition IL where
-  "IL P C Q \<longleftrightarrow> Q \<subseteq> sem C P"
 
 subsection \<open>Encoding Incorrectness Logic\<close>
 

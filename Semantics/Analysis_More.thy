@@ -2,6 +2,21 @@ theory Analysis_More
   imports Ordinary_Differential_Equations.Flow
 begin
 
+subsection \<open>Compatibility facts for Isabelle2025\<close>
+
+text \<open>The facts \<open>member_filter\<close> and \<open>list_all_simps\<close> were
+removed from the HOL library after Isabelle2024; several proofs here refer
+to them by name inside \<^theory_text>\<open>metis\<close>/\<^theory_text>\<open>smt\<close> calls, so we recreate the
+facts under their old names.\<close>
+
+lemma member_filter: "a \<in> Set.filter P A \<longleftrightarrow> a \<in> A \<and> P a"
+  by (simp add: Set.filter_eq)
+
+lemma list_all_simps:
+  "list_all P [] = True"
+  "list_all P (x # xs) = (P x \<and> list_all P xs)"
+  by simp_all
+
 
 subsection \<open>Some results about derivatives\<close>
 

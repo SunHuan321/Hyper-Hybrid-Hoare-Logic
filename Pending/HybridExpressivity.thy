@@ -11,8 +11,27 @@ definition seq_step where
 
 lemma in_sem_iff_seq_step:
   "\<phi>' \<in> sem C S \<longleftrightarrow> (\<exists>\<phi>\<in>S. seq_step C \<phi> \<phi>')"
-  unfolding sem_def seq_step_def lproj_def pproj_def tproj_def
-  by force
+proof
+  assume a: "\<phi>' \<in> sem C S"
+  then obtain \<sigma>\<^sub>p l l' where x: "(fst \<phi>', \<sigma>\<^sub>p, l) \<in> S" "big_step C \<sigma>\<^sub>p l' (fst (snd \<phi>'))"
+    "snd (snd \<phi>') = l @ l'"
+    by (metis in_sem)
+  then have "seq_step C (fst \<phi>', \<sigma>\<^sub>p, l) \<phi>'"
+    unfolding seq_step_def lproj_def pproj_def tproj_def by auto
+  with x(1) show "\<exists>\<phi>\<in>S. seq_step C \<phi> \<phi>'"
+    by blast
+next
+  assume "(\<exists>\<phi>\<in>S. seq_step C \<phi> \<phi>')"
+  then obtain \<phi> tr where y: "\<phi> \<in> S" "lproj \<phi> = lproj \<phi>'"
+    "big_step C (pproj \<phi>) tr (pproj \<phi>')" "tproj \<phi>' = tproj \<phi> @ tr"
+    unfolding seq_step_def by blast
+  have "\<phi>' = (lproj \<phi>', pproj \<phi>', tproj \<phi> @ tr)"
+    using y(4) by (metis (no_types, lifting) lproj_def pproj_def tproj_def prod.collapse)
+  moreover have "(lproj \<phi>', pproj \<phi>, tproj \<phi>) \<in> S"
+    using y(1,2) by (metis (no_types, lifting) lproj_def pproj_def tproj_def prod.collapse)
+  ultimately show "\<phi>' \<in> sem C S"
+    unfolding sem_def using y(3) by blast
+qed
 
 lemma seq_step_lupdate:
   assumes "seq_step C \<phi> \<phi>'"
@@ -86,14 +105,14 @@ definition encode_CHL where
 lemma encode_CHLI:
   assumes "\<And>states. (\<forall>i. states i \<in> S \<and> lproj (states i) x = from_index i) \<Longrightarrow> states \<in> P"
   shows "encode_CHL from_index x P S"
-  using assms encode_CHL_def by blast
+  using assms encode_CHL_def by meson
 
 lemma encode_CHLE:
   assumes "encode_CHL from_index x P S"
       and "\<And>i. states i \<in> S"
       and "\<And>i. lproj (states i) x = from_index i"
     shows "states \<in> P"
-  using assms encode_CHL_def by blast
+  using assms encode_CHL_def by meson
 
 theorem encoding_CHL:
   assumes "not_free_var_of P x"
@@ -156,7 +175,7 @@ next
         then have "from_index j = from_index i"
           using f_def by simp
         then have "j = i"
-          using assms(3) injective_def by blast
+          using assms(3) injective_def by meson
         then show "f i = ?states i"
           using j_def by simp
       qed
@@ -179,7 +198,7 @@ next
     proof (rule encode_CHLE[OF encQ])
       fix i
       have "seq_step C (?states i) (?states' i)"
-        using k_semE[OF asm(2), of i] seq_step_lupdate by blast
+        using k_semE[OF asm(2), of i] seq_step_lupdate by metis
       moreover have "?states i \<in> ?S"
         by simp
       ultimately show "?states' i \<in> sem C ?S"

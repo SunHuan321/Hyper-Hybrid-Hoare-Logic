@@ -331,7 +331,9 @@ theorem Valid_inv_k:
       from a0 b1 have bk: "b (pproj (ess' k))" by blast
       show "(\<exists>p d. d > 0 \<and> ODEsol ode p d \<and> (\<forall>t. t \<ge> 0 \<and> t < d \<longrightarrow> b (p t)) \<and> 
     \<not>b (p d) \<and> p 0 = (pproj (ess' k)) \<and> trs k = [WaitBlk d (\<lambda>\<tau>. State (p \<tau>)) ({}, {})])"
-        using bk bs by (metis contE)
+        apply (rule contE [OF bs])
+         apply (simp add: bk)
+        by blast
     qed
     then have "\<exists>ps ds. (\<forall>k. ds k > 0 \<and> ODEsol ode (ps k) (ds k) \<and> (\<forall>t. t \<ge> 0 \<and> t < ds k \<longrightarrow> b (ps k t)) \<and> 
     \<not>b (ps k (ds k)) \<and> ps k 0 = (pproj (ess' k)) \<and> trs k = [WaitBlk (ds k) (\<lambda>\<tau>. State (ps k \<tau>)) ({}, {})])"
@@ -407,7 +409,9 @@ theorem Valid_inv_barrier_s_tr_le_k:
       from a0 b1 have bk: "b (pproj (ess' k))" by blast
       show "(\<exists>p d. d > 0 \<and> ODEsol ode p d \<and> (\<forall>t. t \<ge> 0 \<and> t < d \<longrightarrow> b (p t)) \<and> 
     \<not>b (p d) \<and> p 0 = (pproj (ess' k)) \<and> trs k = [WaitBlk d (\<lambda>\<tau>. State (p \<tau>)) ({}, {})])"
-        using bk bs by (metis contE)
+        apply (rule contE [OF bs])
+         apply (simp add: bk)
+        by blast
     qed
     then have "\<exists>ps ds. (\<forall>k. ds k > 0 \<and> ODEsol ode (ps k) (ds k) \<and> (\<forall>t. t \<ge> 0 \<and> t < ds k \<longrightarrow> b (ps k t)) \<and> 
     \<not>b (ps k (ds k)) \<and> ps k 0 = (pproj (ess' k)) \<and> trs k = [WaitBlk (ds k) (\<lambda>\<tau>. State (ps k \<tau>)) ({}, {})])"
