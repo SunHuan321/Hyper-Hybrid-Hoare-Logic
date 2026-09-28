@@ -14,6 +14,14 @@ lemma set_of_traces_eq:
   "set_of_traces C = {(s, l, s') |s l s'. par_big_step C s l s'}"
   unfolding set_of_traces_def by blast
 
+lemma mem_set_of_traces_eq:
+  "(s, l, s') \<in> set_of_traces C \<longleftrightarrow> par_big_step C s l s'"
+  by (simp add: set_of_traces_eq)
+
+lemma ex_swap:
+  "\<exists>x y. P x y \<Longrightarrow> \<exists>y x. P x y"
+  by blast
+
 lemma resid_test:
   assumes H: "\<forall>trc sc'. P trc sc' \<longrightarrow> (\<exists>tra sa'. Q trc tra sc' sa')"
       and P0: "P trc sc'"
@@ -323,22 +331,233 @@ lemma hrl_single_refinement_iff_hybrid_sim:
   "hrl_single_refinement \<alpha> Pc Pa \<longleftrightarrow>
     (\<forall>sc. (\<exists>trc sc'. (State sc, trc, State sc') \<in> set_of_traces (Single Pc)) \<longrightarrow>
       (\<exists>sa. (Pc, sc) \<sqsubseteq> \<alpha> (Pa, sa)))"
-  unfolding hrl_single_refinement_def hybrid_sim_single_def
-  by (auto simp add: set_of_traces_def elim: SingleE intro: SingleB, meson)
+proof
+  assume H: "hrl_single_refinement \<alpha> Pc Pa"
+  show "\<forall>sc. (\<exists>trc sc'. (State sc, trc, State sc') \<in> set_of_traces (Single Pc)) \<longrightarrow>
+      (\<exists>sa. (Pc, sc) \<sqsubseteq> \<alpha> (Pa, sa))"
+  proof (intro allI impI)
+    fix sc
+    assume ex: "\<exists>trc sc'. (State sc, trc, State sc') \<in> set_of_traces (Single Pc)"
+    from ex obtain trc0 sc'0 where mem0: "(State sc, trc0, State sc'0) \<in> set_of_traces (Single Pc)"
+      by blast
+    from mem0 have pbs0: "par_big_step (Single Pc) (State sc) trc0 (State sc'0)"
+      by (simp add: mem_set_of_traces_eq)
+    from pbs0 have bs0: "big_step Pc sc trc0 sc'0"
+      by simp
+    let ?sa = "SOME sa. (sc, sa) \<in> \<alpha> \<and>
+      (\<forall>sc' trc. big_step Pc sc trc sc' \<longrightarrow>
+        (\<exists>sa' tra. big_step Pa sa tra sa' \<and> tr_single \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>))"
+    have saEx: "\<exists>sa. (sc, sa) \<in> \<alpha> \<and>
+      (\<forall>sc' trc. big_step Pc sc trc sc' \<longrightarrow>
+        (\<exists>sa' tra. big_step Pa sa tra sa' \<and> tr_single \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>))"
+      by (meson H[unfolded hrl_single_refinement_def, rule_format, OF ex, unfolded hybrid_sim_single_def])
+    from someI_ex[OF saEx] have sa: "((sc, ?sa) \<in> \<alpha> \<and>
+      (\<forall>sc' trc. big_step Pc sc trc sc' \<longrightarrow>
+        (\<exists>sa' tra. big_step Pa ?sa tra sa' \<and> tr_single \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>)))" .
+    from sa have sa1: "(sc, ?sa) \<in> \<alpha>" by blast
+    from sa have sa2: "\<forall>sc' trc. big_step Pc sc trc sc' \<longrightarrow>
+        (\<exists>sa' tra. big_step Pa ?sa tra sa' \<and> tr_single \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>)" by blast
+    show "\<exists>sa. (Pc, sc) \<sqsubseteq> \<alpha> (Pa, sa)"
+    proof
+      show "(Pc, sc) \<sqsubseteq> \<alpha> (Pa, ?sa)"
+        unfolding hybrid_sim_single_def
+      proof (intro conjI allI impI)
+        show "(sc, ?sa) \<in> \<alpha>" by (rule sa1)
+      next
+        fix trc sc'
+        assume "big_step Pc sc trc sc'"
+        with sa2 show "\<exists>sa' tra. big_step Pa ?sa tra sa' \<and> tr_single \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>"
+          by blast
+      qed
+    qed
+  qed
+next
+  assume H: "\<forall>sc. (\<exists>trc sc'. (State sc, trc, State sc') \<in> set_of_traces (Single Pc)) \<longrightarrow>
+      (\<exists>sa. (Pc, sc) \<sqsubseteq> \<alpha> (Pa, sa))"
+  show "hrl_single_refinement \<alpha> Pc Pa"
+    unfolding hrl_single_refinement_def
+  proof (intro allI impI)
+    fix sc
+    assume ex: "\<exists>trc sc'. (State sc, trc, State sc') \<in> set_of_traces (Single Pc)"
+    let ?sa = "SOME sa. (sc, sa) \<in> \<alpha> \<and>
+      (\<forall>sc' trc. big_step Pc sc trc sc' \<longrightarrow>
+        (\<exists>sa' tra. big_step Pa sa tra sa' \<and> tr_single \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>))"
+    from H[rule_format, OF ex, unfolded hybrid_sim_single_def]
+    have saEx: "\<exists>sa. (sc, sa) \<in> \<alpha> \<and>
+      (\<forall>sc' trc. big_step Pc sc trc sc' \<longrightarrow>
+        (\<exists>sa' tra. big_step Pa sa tra sa' \<and> tr_single \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>))" .
+    from someI_ex[OF saEx] have sa: "((sc, ?sa) \<in> \<alpha> \<and>
+      (\<forall>sc' trc. big_step Pc sc trc sc' \<longrightarrow>
+        (\<exists>sa' tra. big_step Pa ?sa tra sa' \<and> tr_single \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>)))" .
+    from sa have sa1: "(sc, ?sa) \<in> \<alpha>" by blast
+    from sa have sa2: "\<forall>sc' trc. big_step Pc sc trc sc' \<longrightarrow>
+        (\<exists>sa' tra. big_step Pa ?sa tra sa' \<and> tr_single \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>)" by blast
+    show "\<exists>sa. (sc, sa) \<in> \<alpha> \<and>
+      (\<forall>trc sc'. (State sc, trc, State sc') \<in> set_of_traces (Single Pc) \<longrightarrow>
+        (\<exists>tra sa'. big_step Pa sa tra sa' \<and> tr_single \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>))"
+    proof (intro exI conjI)
+      show "(sc, ?sa) \<in> \<alpha>" by (rule sa1)
+    next
+      show "\<forall>trc sc'. (State sc, trc, State sc') \<in> set_of_traces (Single Pc) \<longrightarrow>
+        (\<exists>tra sa'. big_step Pa sa tra sa' \<and> tr_single \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>)"
+      proof (intro allI impI)
+        fix trc sc'
+        assume mem: "(State sc, trc, State sc') \<in> set_of_traces (Single Pc)"
+        then have pbs: "par_big_step (Single Pc) (State sc) trc (State sc')"
+          by (simp add: mem_set_of_traces_eq)
+        then have pbs2: "big_step Pc sc trc sc'"
+          by simp
+        show "\<exists>tra sa'. big_step Pa ?sa tra sa' \<and> tr_single \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>"
+          using sa2[rule_format, OF pbs2] by meson
+      qed
+    qed
+  qed
+qed
 
 lemma hrl_par_refinement_iff_hybrid_sim:
   "hrl_par_refinement \<alpha> Pc Pa \<longleftrightarrow>
     (\<forall>sc. (\<exists>trc sc'. (sc, trc, sc') \<in> set_of_traces Pc) \<longrightarrow>
       (\<exists>sa. (Pc, sc) \<sqsubseteq>\<^sub>p \<alpha> (Pa, sa)))"
-  unfolding hrl_par_refinement_def hybrid_sim_par_def set_of_traces_def
-  by (auto simp: set_of_traces_def, force)
+proof
+  assume H: "hrl_par_refinement \<alpha> Pc Pa"
+  show "\<forall>sc. (\<exists>trc sc'. (sc, trc, sc') \<in> set_of_traces Pc) \<longrightarrow>
+      (\<exists>sa. (Pc, sc) \<sqsubseteq>\<^sub>p \<alpha> (Pa, sa))"
+  proof (intro allI impI)
+    fix sc
+    assume ex: "\<exists>trc sc'. (sc, trc, sc') \<in> set_of_traces Pc"
+    with H[unfolded hrl_par_refinement_def, rule_format, of sc]
+    obtain sa where sa: "(sc, sa) \<in> \<alpha> \<and>
+      (\<forall>trc sc'. (sc, trc, sc') \<in> set_of_traces Pc \<longrightarrow>
+        (\<exists>tra sa'. par_big_step Pa sa tra sa' \<and> tr_par \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>))"
+      by blast
+    show "\<exists>sa. (Pc, sc) \<sqsubseteq>\<^sub>p \<alpha> (Pa, sa)"
+    proof
+      show "(Pc, sc) \<sqsubseteq>\<^sub>p \<alpha> (Pa, sa)"
+        unfolding hybrid_sim_par_def
+      proof (intro conjI allI impI)
+        show "(sc, sa) \<in> \<alpha>" using sa by blast
+      next
+        fix trc sc'
+        assume "par_big_step Pc sc trc sc'"
+        then have "(sc, trc, sc') \<in> set_of_traces Pc"
+          by (simp add: mem_set_of_traces_eq)
+        with sa show "\<exists>sa' tra. par_big_step Pa sa tra sa' \<and> tr_par \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>"
+          by blast
+      qed
+    qed
+  qed
+next
+  assume H: "\<forall>sc. (\<exists>trc sc'. (sc, trc, sc') \<in> set_of_traces Pc) \<longrightarrow>
+      (\<exists>sa. (Pc, sc) \<sqsubseteq>\<^sub>p \<alpha> (Pa, sa))"
+  show "hrl_par_refinement \<alpha> Pc Pa"
+    unfolding hrl_par_refinement_def
+  proof (intro allI impI)
+    fix sc
+    assume ex: "\<exists>trc sc'. (sc, trc, sc') \<in> set_of_traces Pc"
+    from ex obtain trc0 sc'0 where mem0: "(sc, trc0, sc'0) \<in> set_of_traces Pc" by blast
+    from mem0 have pbs0: "par_big_step Pc sc trc0 sc'0" by (simp add: mem_set_of_traces_eq)
+    let ?sa = "SOME sa. \<forall>sc' trc. par_big_step Pc sc trc sc' \<longrightarrow>
+        ((sc, sa) \<in> \<alpha> \<and> (\<exists>sa' tra. par_big_step Pa sa tra sa' \<and> tr_par \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>))"
+    from H[rule_format, OF ex, unfolded hybrid_sim_par_def]
+    have saEx: "\<exists>sa. \<forall>sc' trc. par_big_step Pc sc trc sc' \<longrightarrow>
+        ((sc, sa) \<in> \<alpha> \<and> (\<exists>sa' tra. par_big_step Pa sa tra sa' \<and> tr_par \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>))" .
+    from someI_ex[OF saEx] have sa: "\<forall>sc' trc. par_big_step Pc sc trc sc' \<longrightarrow>
+        ((sc, ?sa) \<in> \<alpha> \<and> (\<exists>sa' tra. par_big_step Pa ?sa tra sa' \<and> tr_par \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>))" .
+    from sa[rule_format, OF pbs0] have sa1: "(sc, ?sa) \<in> \<alpha>" by blast
+    from sa have sa2: "\<forall>sc' trc. par_big_step Pc sc trc sc' \<longrightarrow>
+             ((sc, ?sa) \<in> \<alpha> \<and> (\<exists>sa' tra. par_big_step Pa ?sa tra sa' \<and> tr_par \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>))" by blast
+    show "\<exists>sa. (sc, sa) \<in> \<alpha> \<and>
+      (\<forall>trc sc'. (sc, trc, sc') \<in> set_of_traces Pc \<longrightarrow>
+        (\<exists>tra sa'. par_big_step Pa sa tra sa' \<and> tr_par \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>))"
+    proof (intro exI conjI)
+      show "(sc, ?sa) \<in> \<alpha>" by (rule sa1)
+    next
+      show "\<forall>trc sc'. (sc, trc, sc') \<in> set_of_traces Pc \<longrightarrow>
+        (\<exists>tra sa'. par_big_step Pa ?sa tra sa' \<and> tr_par \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>)"
+      proof (intro allI impI)
+        fix trc sc'
+        assume mem: "(sc, trc, sc') \<in> set_of_traces Pc"
+        then have pbs: "par_big_step Pc sc trc sc'"
+          by (simp add: mem_set_of_traces_eq)
+        show "\<exists>tra sa'. par_big_step Pa ?sa tra sa' \<and> tr_par \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>"
+          using sa2[rule_format, OF pbs] by (meson ex_swap)
+      qed
+    qed
+  qed
+qed
 
 lemma hrl_int_refinement_iff_hybrid_sim:
   "hrl_int_refinement \<alpha> Pc Pa \<longleftrightarrow>
     (\<forall>sc. (\<exists>trc sc'. (sc, trc, sc') \<in> set_of_traces Pc) \<longrightarrow>
       (\<exists>sa. (Pc, sc) \<sqsubseteq>\<^sub>I \<alpha> (Pa, sa)))"
-  unfolding hrl_int_refinement_def hybrid_sim_int_def set_of_traces_def
-  by (auto simp: set_of_traces_def, meson)
+proof
+  assume H: "hrl_int_refinement \<alpha> Pc Pa"
+  show "\<forall>sc. (\<exists>trc sc'. (sc, trc, sc') \<in> set_of_traces Pc) \<longrightarrow>
+      (\<exists>sa. (Pc, sc) \<sqsubseteq>\<^sub>I \<alpha> (Pa, sa))"
+  proof (intro allI impI)
+    fix sc
+    assume ex: "\<exists>trc sc'. (sc, trc, sc') \<in> set_of_traces Pc"
+    with H[unfolded hrl_int_refinement_def, rule_format, of sc]
+    obtain sa where sa: "(sc, sa) \<in> \<alpha> \<and>
+        (\<forall>trc sc'. (sc, trc, sc') \<in> set_of_traces Pc \<longrightarrow>
+          (\<exists>tra sa'. big_step Pa sa tra sa' \<and> tr_int \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>))"
+      by blast
+    show "\<exists>sa. (Pc, sc) \<sqsubseteq>\<^sub>I \<alpha> (Pa, sa)"
+    proof
+      show "(Pc, sc) \<sqsubseteq>\<^sub>I \<alpha> (Pa, sa)"
+        unfolding hybrid_sim_int_def
+      proof (intro conjI allI impI)
+        show "(sc, sa) \<in> \<alpha>" using sa by blast
+      next
+        fix trc sc'
+        assume "par_big_step Pc sc trc sc'"
+        then have "(sc, trc, sc') \<in> set_of_traces Pc"
+          by (simp add: mem_set_of_traces_eq)
+        with sa show "\<exists>sa' tra. big_step Pa sa tra sa' \<and> tr_int \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>"
+          by blast
+      qed
+    qed
+  qed
+next
+  assume H: "\<forall>sc. (\<exists>trc sc'. (sc, trc, sc') \<in> set_of_traces Pc) \<longrightarrow>
+      (\<exists>sa. (Pc, sc) \<sqsubseteq>\<^sub>I \<alpha> (Pa, sa))"
+  show "hrl_int_refinement \<alpha> Pc Pa"
+    unfolding hrl_int_refinement_def
+  proof (intro allI impI)
+    fix sc
+    assume ex: "\<exists>trc sc'. (sc, trc, sc') \<in> set_of_traces Pc"
+    let ?sa = "SOME sa. (sc, sa) \<in> \<alpha> \<and>
+      (\<forall>sc' trc. par_big_step Pc sc trc sc' \<longrightarrow>
+        (\<exists>sa' tra. big_step Pa sa tra sa' \<and> tr_int \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>))"
+    from H[rule_format, OF ex, unfolded hybrid_sim_int_def]
+    have saEx: "\<exists>sa. (sc, sa) \<in> \<alpha> \<and>
+      (\<forall>sc' trc. par_big_step Pc sc trc sc' \<longrightarrow>
+        (\<exists>sa' tra. big_step Pa sa tra sa' \<and> tr_int \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>))" .
+    from someI_ex[OF saEx] have sa: "((sc, ?sa) \<in> \<alpha> \<and>
+      (\<forall>sc' trc. par_big_step Pc sc trc sc' \<longrightarrow>
+        (\<exists>sa' tra. big_step Pa ?sa tra sa' \<and> tr_int \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>)))" .
+    from sa have sa1: "(sc, ?sa) \<in> \<alpha>" by blast
+    from sa have sa2: "\<forall>sc' trc. par_big_step Pc sc trc sc' \<longrightarrow>
+             (\<exists>sa' tra. big_step Pa ?sa tra sa' \<and> tr_int \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>)" by blast
+    show "\<exists>sa. (sc, sa) \<in> \<alpha> \<and>
+      (\<forall>trc sc'. (sc, trc, sc') \<in> set_of_traces Pc \<longrightarrow>
+        (\<exists>tra sa'. big_step Pa sa tra sa' \<and> tr_int \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>))"
+    proof (intro exI conjI)
+      show "(sc, ?sa) \<in> \<alpha>" by (rule sa1)
+    next
+      show "\<forall>trc sc'. (sc, trc, sc') \<in> set_of_traces Pc \<longrightarrow>
+        (\<exists>tra sa'. big_step Pa sa tra sa' \<and> tr_int \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>)"
+      proof (intro allI impI)
+        fix trc sc'
+        assume mem: "(sc, trc, sc') \<in> set_of_traces Pc"
+        then have pbs: "par_big_step Pc sc trc sc'"
+          by (simp add: mem_set_of_traces_eq)
+        show "\<exists>tra sa'. big_step Pa ?sa tra sa' \<and> tr_int \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>"
+          using sa2[rule_format, OF pbs] by (meson ex_swap)
+      qed
+    qed
+  qed
+qed
 
 lemma hrl_single_hyperproperty_lower_closed:
   "lower_closed (hrl_single_hyperproperty \<alpha> Pa)"
@@ -387,17 +606,80 @@ lemma hybrid_sim_par_hrl_refinement:
   assumes "\<And>sc. (\<exists>trc sc'. (sc, trc, sc') \<in> set_of_traces Pc) \<Longrightarrow>
     \<exists>sa. (Pc, sc) \<sqsubseteq>\<^sub>p \<alpha> (Pa, sa)"
   shows "hrl_par_refinement \<alpha> Pc Pa"
-  using assms
-  unfolding hrl_par_refinement_def hybrid_sim_par_def set_of_traces_def
-  by (auto simp: set_of_traces_def, force)
+  unfolding hrl_par_refinement_def
+proof (intro allI impI)
+  fix sc
+  assume ex: "\<exists>trc sc'. (sc, trc, sc') \<in> set_of_traces Pc"
+  from ex obtain trc0 sc'0 where mem0: "(sc, trc0, sc'0) \<in> set_of_traces Pc" by blast
+  from mem0 have pbs0: "par_big_step Pc sc trc0 sc'0" by (simp add: mem_set_of_traces_eq)
+  let ?sa = "SOME sa. \<forall>sc' trc. par_big_step Pc sc trc sc' \<longrightarrow>
+      ((sc, sa) \<in> \<alpha> \<and> (\<exists>sa' tra. par_big_step Pa sa tra sa' \<and> tr_par \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>))"
+  from assms[OF ex, unfolded hybrid_sim_par_def]
+  have saEx: "\<exists>sa. \<forall>sc' trc. par_big_step Pc sc trc sc' \<longrightarrow>
+      ((sc, sa) \<in> \<alpha> \<and> (\<exists>sa' tra. par_big_step Pa sa tra sa' \<and> tr_par \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>))" .
+  from someI_ex[OF saEx] have sa: "\<forall>sc' trc. par_big_step Pc sc trc sc' \<longrightarrow>
+      ((sc, ?sa) \<in> \<alpha> \<and> (\<exists>sa' tra. par_big_step Pa ?sa tra sa' \<and> tr_par \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>))" .
+  from sa[rule_format, OF pbs0] have sa1: "(sc, ?sa) \<in> \<alpha>" by blast
+  from sa have sa2: "\<forall>sc' trc. par_big_step Pc sc trc sc' \<longrightarrow>
+           ((sc, ?sa) \<in> \<alpha> \<and> (\<exists>sa' tra. par_big_step Pa ?sa tra sa' \<and> tr_par \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>))" by blast
+  show "\<exists>sa. (sc, sa) \<in> \<alpha> \<and>
+      (\<forall>trc sc'. (sc, trc, sc') \<in> set_of_traces Pc \<longrightarrow>
+        (\<exists>tra sa'. par_big_step Pa sa tra sa' \<and> tr_par \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>))"
+  proof (intro exI conjI)
+    show "(sc, ?sa) \<in> \<alpha>" by (rule sa1)
+  next
+    show "\<forall>trc sc'. (sc, trc, sc') \<in> set_of_traces Pc \<longrightarrow>
+        (\<exists>tra sa'. par_big_step Pa ?sa tra sa' \<and> tr_par \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>)"
+    proof (intro allI impI)
+      fix trc sc'
+      assume mem: "(sc, trc, sc') \<in> set_of_traces Pc"
+      then have pbs: "par_big_step Pc sc trc sc'"
+        by (simp add: mem_set_of_traces_eq)
+      show "\<exists>tra sa'. par_big_step Pa ?sa tra sa' \<and> tr_par \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>"
+        using sa2[rule_format, OF pbs] by (meson ex_swap)
+    qed
+  qed
+qed
 
 lemma hybrid_sim_int_hrl_refinement:
   assumes "\<And>sc. (\<exists>trc sc'. (sc, trc, sc') \<in> set_of_traces Pc) \<Longrightarrow>
     \<exists>sa. (Pc, sc) \<sqsubseteq>\<^sub>I \<alpha> (Pa, sa)"
   shows "hrl_int_refinement \<alpha> Pc Pa"
-  using assms
-  unfolding hrl_int_refinement_def hybrid_sim_int_def set_of_traces_def
-  by (auto simp: set_of_traces_def, meson)
+  unfolding hrl_int_refinement_def
+proof (intro allI impI)
+  fix sc
+  assume ex: "\<exists>trc sc'. (sc, trc, sc') \<in> set_of_traces Pc"
+  let ?sa = "SOME sa. (sc, sa) \<in> \<alpha> \<and>
+    (\<forall>sc' trc. par_big_step Pc sc trc sc' \<longrightarrow>
+      (\<exists>sa' tra. big_step Pa sa tra sa' \<and> tr_int \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>))"
+  from assms[OF ex, unfolded hybrid_sim_int_def]
+  have saEx: "\<exists>sa. (sc, sa) \<in> \<alpha> \<and>
+    (\<forall>sc' trc. par_big_step Pc sc trc sc' \<longrightarrow>
+      (\<exists>sa' tra. big_step Pa sa tra sa' \<and> tr_int \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>))" .
+  from someI_ex[OF saEx] have sa: "((sc, ?sa) \<in> \<alpha> \<and>
+    (\<forall>sc' trc. par_big_step Pc sc trc sc' \<longrightarrow>
+      (\<exists>sa' tra. big_step Pa ?sa tra sa' \<and> tr_int \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>)))" .
+  from sa have sa1: "(sc, ?sa) \<in> \<alpha>" by blast
+  from sa have sa2: "\<forall>sc' trc. par_big_step Pc sc trc sc' \<longrightarrow>
+           (\<exists>sa' tra. big_step Pa ?sa tra sa' \<and> tr_int \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>)" by blast
+  show "\<exists>sa. (sc, sa) \<in> \<alpha> \<and>
+      (\<forall>trc sc'. (sc, trc, sc') \<in> set_of_traces Pc \<longrightarrow>
+        (\<exists>tra sa'. big_step Pa sa tra sa' \<and> tr_int \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>))"
+  proof (intro exI conjI)
+    show "(sc, ?sa) \<in> \<alpha>" by (rule sa1)
+  next
+    show "\<forall>trc sc'. (sc, trc, sc') \<in> set_of_traces Pc \<longrightarrow>
+        (\<exists>tra sa'. big_step Pa sa tra sa' \<and> tr_int \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>)"
+    proof (intro allI impI)
+      fix trc sc'
+      assume mem: "(sc, trc, sc') \<in> set_of_traces Pc"
+      then have pbs: "par_big_step Pc sc trc sc'"
+        by (simp add: mem_set_of_traces_eq)
+      show "\<exists>tra sa'. big_step Pa ?sa tra sa' \<and> tr_int \<alpha> trc tra \<and> (sc', sa') \<in> \<alpha>"
+        using sa2[rule_format, OF pbs] by (meson ex_swap)
+    qed
+  qed
+qed
 
 subsection \<open>Simulation Relations as Execution Relations\<close>
 
@@ -469,21 +751,33 @@ lemma resid_exec_par:
       and A2: "par_big_step Pc sc trc sc'"
     shows "\<exists>sa' tra. par_big_step Pa sa tra sa' \<and>
       par_execution_rel \<alpha> (sc, trc, sc') (sa, tra, sa')"
-  using A1 A2 unfolding hybrid_sim_par_def par_execution_rel_def by blast
+proof -
+  from A1[unfolded hybrid_sim_par_def, rule_format, OF A2]
+  obtain sa' tra where
+    e1: "par_big_step Pa sa tra sa'" and
+    e2: "tr_par \<alpha> trc tra" and e3: "(sc', sa') \<in> \<alpha>" and e4: "(sc, sa) \<in> \<alpha>"
+    by (metis (no_types, opaque_lifting))
+  have "par_execution_rel \<alpha> (sc, trc, sc') (sa, tra, sa')"
+    unfolding par_execution_rel_def
+    apply (rule exI[where x=sc], rule exI[where x=sc'], rule exI[where x=sa],
+           rule exI[where x=sa'], rule exI[where x=trc], rule exI[where x=tra])
+    using e1 e2 e3 e4 by simp
+  with e1 show ?thesis by (metis (no_types, opaque_lifting))
+qed
 
 lemma hybrid_sim_par_to_set_of_traces:
   assumes "(Pc, sc) \<sqsubseteq>\<^sub>p \<alpha> (Pa, sa)"
       and "(sc, trc, sc') \<in> set_of_traces Pc"
     shows "\<exists>ea \<in> set_of_traces Pa. par_execution_rel \<alpha> (sc, trc, sc') ea"
 proof -
-  from assms(2)[unfolded set_of_traces_eq] have pbs: "par_big_step Pc sc trc sc'"
-    by auto
+  from assms(2) have pbs: "par_big_step Pc sc trc sc'"
+    by (simp add: mem_set_of_traces_eq)
   from resid_exec_par[OF assms(1) pbs] obtain sa' tra where
     e1: "par_big_step Pa sa tra sa'" and
     e2: "par_execution_rel \<alpha> (sc, trc, sc') (sa, tra, sa')"
     by blast
   have "(sa, tra, sa') \<in> set_of_traces Pa"
-    unfolding set_of_traces_eq using e1 by blast
+    using e1 by (simp add: mem_set_of_traces_eq)
   with e2 show ?thesis
     by blast
 qed
@@ -492,9 +786,20 @@ lemma hybrid_sim_par_execution_refines:
   assumes "\<And>sc trc sc'. (sc, trc, sc') \<in> set_of_traces Pc \<Longrightarrow>
     \<exists>sa. (Pc, sc) \<sqsubseteq>\<^sub>p \<alpha> (Pa, sa)"
   shows "execution_refines (par_execution_rel \<alpha>) Pc Pa"
-  using assms hybrid_sim_par_to_set_of_traces
   unfolding execution_refines_def
-  by (meson assms hybrid_sim_par_to_set_of_traces)
+proof
+  fix ec
+  assume ec: "ec \<in> set_of_traces Pc"
+  then obtain sc trc sc' where ec': "ec = (sc, trc, sc')"
+    by (metis prod.collapse)
+  with ec have mem: "(sc, trc, sc') \<in> set_of_traces Pc"
+    by simp
+  from assms(1)[OF mem] obtain sa where sim: "(Pc, sc) \<sqsubseteq>\<^sub>p \<alpha> (Pa, sa)"
+    by blast
+  from hybrid_sim_par_to_set_of_traces[OF sim mem]
+  show "\<exists>ea\<in>set_of_traces Pa. par_execution_rel \<alpha> ec ea"
+    unfolding ec' by blast
+qed
 
 lemma hybrid_sim_int_execution:
   assumes "(Pc, sc) \<sqsubseteq>\<^sub>I \<alpha> (Pa, sa)"
@@ -525,8 +830,19 @@ lemma hybrid_sim_int_execution_refines:
   assumes "\<And>sc trc sc'. (sc, trc, sc') \<in> set_of_traces Pc \<Longrightarrow>
     \<exists>sa. (Pc, sc) \<sqsubseteq>\<^sub>I \<alpha> (Pa, sa)"
   shows "execution_refines (int_execution_rel \<alpha>) Pc (Single Pa)"
-  using assms hybrid_sim_int_to_set_of_traces
   unfolding execution_refines_def
-  by (meson assms hybrid_sim_int_to_set_of_traces)
+proof
+  fix ec
+  assume ec: "ec \<in> set_of_traces Pc"
+  then obtain sc trc sc' where ec': "ec = (sc, trc, sc')"
+    by (metis prod.collapse)
+  with ec have mem: "(sc, trc, sc') \<in> set_of_traces Pc"
+    by simp
+  from assms(1)[OF mem] obtain sa where sim: "(Pc, sc) \<sqsubseteq>\<^sub>I \<alpha> (Pa, sa)"
+    by blast
+  from hybrid_sim_int_to_set_of_traces[OF sim mem]
+  show "\<exists>ea\<in>set_of_traces (Single Pa). int_execution_rel \<alpha> ec ea"
+    unfolding ec' by blast
+qed
 
 end
